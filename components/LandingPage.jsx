@@ -609,72 +609,100 @@ function Nav({ theme = "light" }) {
 // =========================================================
 function Hero() {
   return (
-    // overflow:visible (not hidden) so the orange gradient bleeds *behind* the
-    // transparent sticky header — fills the white strip at the top of the page.
-    // body has overflow-x:clip so horizontal bleed is safely clipped at the viewport.
-    <section data-section-theme="light" style={{ position: "relative", padding: "72px 0 80px", overflow: "visible" }}>
+    // Hero fills the viewport between the sticky header (~96px tall) and the
+    // bottom edge. Flexbox column distributes: text/CTA block sits at the top,
+    // logo carousel pins to the bottom with 32px breathing room from the
+    // viewport's bottom edge. overflow:visible keeps the gradient flowing
+    // behind the transparent header.
+    <section
+      data-section-theme="light"
+      style={{
+        position: "relative",
+        minHeight: "calc(100vh - 96px)",
+        display: "flex",
+        flexDirection: "column",
+        padding: 0,
+        overflow: "visible",
+      }}
+    >
       <HeroFlowVisual />
-      <Container style={{ position: "relative", zIndex: 2 }}>
-        <Reveal>
-          <h1
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontSize: 48,
-              lineHeight: 1.08,
-              letterSpacing: "-0.028em",
-              fontWeight: 500,
-              color: T.ink,
-              margin: "0",
-              maxWidth: 880,
-            }}
-          >
-            The unified <span style={{ color: T.persimmon600 }}>AI-native</span> platform for restaurant operations.
-          </h1>
-        </Reveal>
-
-        <Reveal delay={160}>
-          <p
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 16,
-              lineHeight: 1.55,
-              color: T.inkMuted,
-              margin: "24px 0 0",
-              maxWidth: 640,
-              letterSpacing: "-0.005em",
-            }}
-          >
-            POS, ordering, kitchen, loyalty, workforce and AI — on one intelligent
-            data layer built for enterprise restaurants. Every order, every channel,
-            every decision, connected.
-          </p>
-        </Reveal>
-
-        <Reveal delay={240}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 36, flexWrap: "wrap" }}>
-            <FlowCTA>Book a demo</FlowCTA>
-            <a
-              href="#"
+      <Container
+        style={{
+          position: "relative",
+          zIndex: 2,
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          paddingTop: 72,
+          paddingBottom: 32,
+        }}
+      >
+        {/* Top stack: headline + description + CTA row */}
+        <div>
+          <Reveal>
+            <h1
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontFamily: FONT_BODY,
-                fontSize: 15,
+                fontFamily: FONT_DISPLAY,
+                fontSize: 48,
+                lineHeight: 1.08,
+                letterSpacing: "-0.028em",
                 fontWeight: 500,
                 color: T.ink,
-                letterSpacing: "-0.005em",
-                textDecoration: "none",
-                padding: "13px 16px",
+                margin: "0",
+                maxWidth: 880,
               }}
             >
-              See the platform <ArrowRight size={15} strokeWidth={2} />
-            </a>
-          </div>
-        </Reveal>
+              The unified <span style={{ color: T.persimmon600 }}>AI-native</span> platform for restaurant operations.
+            </h1>
+          </Reveal>
 
-        {/* Logo carousel — centered inside the content container, marquee with edge fades */}
-        <div style={{ marginTop: 96 }}>
+          <Reveal delay={160}>
+            <p
+              style={{
+                fontFamily: FONT_BODY,
+                fontSize: 16,
+                lineHeight: 1.55,
+                color: T.inkMuted,
+                margin: "24px 0 0",
+                maxWidth: 640,
+                letterSpacing: "-0.005em",
+              }}
+            >
+              POS, ordering, kitchen, loyalty, workforce and AI — on one intelligent
+              data layer built for enterprise restaurants. Every order, every channel,
+              every decision, connected.
+            </p>
+          </Reveal>
+
+          <Reveal delay={240}>
+            {/* +32px padding above the CTA row per spec (36 → 68) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 68, flexWrap: "wrap" }}>
+              <FlowCTA>Book a demo</FlowCTA>
+              <a
+                href="#"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: FONT_BODY,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  color: T.ink,
+                  letterSpacing: "-0.005em",
+                  textDecoration: "none",
+                  padding: "13px 16px",
+                }}
+              >
+                See the platform <ArrowRight size={15} strokeWidth={2} />
+              </a>
+            </div>
+          </Reveal>
+        </div>
+
+        {/* Logo section pinned to the bottom of the hero via marginTop:auto.
+            The Container's paddingBottom:32 keeps it 32px above the section
+            edge — which on initial load matches the viewport bottom edge. */}
+        <div style={{ marginTop: "auto", paddingTop: 48 }}>
           <Reveal>
             <div
               style={{
