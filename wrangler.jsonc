@@ -1,0 +1,12 @@
+{
+  // Static-assets-only Worker. No JS handler, no SSR — Cloudflare's edge
+  // serves the pre-rendered `out/` folder from `next build` (output: "export").
+  // `npx wrangler deploy` reads this config and uploads the directory as-is.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nova-website",
+  "compatibility_date": "2024-12-01",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page"
+  }
+}
