@@ -1,0 +1,260 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   Hearth · CSS variable layer
+   Mirrors the Figma Hearth · Color collection. Use these
+   when Tailwind classes aren't enough (eg. inline gradients).
+   ========================================================= */
+:root {
+  /* Bone */
+  --bone-50:  #FFFFFF;
+  --bone-100: #FAFAFB;
+  --bone-200: #F4F4F6;
+  --bone-300: #E7E7EB;
+  --bone-400: #CECED4;
+  --bone-500: #9C9CA3;
+  --bone-600: #6F6F76;
+  --bone-700: #4E4E54;
+  --bone-800: #2B2B30;
+  --bone-900: #14110F;
+
+  /* Midnight */
+  --midnight-50:  #ECEDF3;
+  --midnight-100: #D6D9E6;
+  --midnight-200: #ADB1C8;
+  --midnight-300: #888DAB;
+  --midnight-400: #5F6692;
+  --midnight-500: #3F4775;
+  --midnight-600: #2A3158;
+  --midnight-700: #1A2042;
+  --midnight-800: #131831;
+  --midnight-900: #0E1124;
+
+  /* Persimmon (brand) */
+  --persimmon-50:  #FEF3EE;
+  --persimmon-100: #FDE3D6;
+  --persimmon-200: #FCC9B0;
+  --persimmon-300: #FAAF89;
+  --persimmon-400: #F9A060;
+  --persimmon-500: #F17857;
+  --persimmon-600: #E9504D;
+  --persimmon-700: #BC3C39;
+  --persimmon-800: #8E2C2A;
+  --persimmon-900: #5C1B1A;
+
+  /* Cobalt */
+  --cobalt-500: #4A60E5;
+  --cobalt-600: #2A4FD6;
+
+  /* Nebula (AI signal) */
+  --nebula-50:  #F1ECFE;
+  --nebula-100: #E2D4FB;
+  --nebula-500: #7C3AED;
+  --nebula-600: #6A43D8;
+
+  /* Matcha */
+  --matcha-500: #16A34A;
+  --matcha-600: #128A3E;
+
+  /* Saffron */
+  --saffron-500: #F59E0B;
+
+  /* Semantic aliases */
+  --canvas:   var(--bone-100);
+  --surface:  var(--bone-50);
+  --mist:     var(--bone-200);
+  --hairline: var(--bone-300);
+  --ink:      var(--bone-900);
+  --ink-soft: var(--bone-600);
+}
+
+/* =========================================================
+   Base
+   ========================================================= */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* `clip` does NOT establish a scroll container, so sticky stays intact. */
+  overflow-x: clip;
+}
+
+/* Hide scrollbars for horizontal-scroll bento shelves */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Selection */
+::selection {
+  background: var(--persimmon-100);
+  color: var(--persimmon-800);
+}
+
+/* =========================================================
+   CTA · clean persimmon pill
+   The rotating conic-gradient ring caused sub-pixel corner leaks
+   that mask + clip-path couldn't fully resolve. The flow effect
+   is now retired in favor of a clean static pill: solid coral fill,
+   subtle inset top highlight for depth, and a coral-tinted drop
+   shadow for the floating-button feel.
+   ========================================================= */
+.cta-flow {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--persimmon-600);
+  color: #FFFFFF;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  overflow: hidden; /* keep any future inner effects pill-bound */
+  transition:
+    transform 220ms cubic-bezier(0.2, 0, 0, 1),
+    background 220ms ease,
+    box-shadow 260ms ease;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 -1px 0 rgba(20, 17, 15, 0.12) inset,
+    0 6px 18px -8px rgba(233, 80, 77, 0.38);
+}
+
+/* Inner top highlight — adds a subtle glassy depth without a ring. */
+.cta-flow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 48%);
+  pointer-events: none;
+}
+
+.cta-flow:hover {
+  transform: translateY(-1px);
+  background: #EE5A57; /* slightly brighter coral on hover */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 -1px 0 rgba(20, 17, 15, 0.12) inset,
+    0 10px 24px -8px rgba(233, 80, 77, 0.48);
+}
+.cta-flow:active {
+  transform: translateY(0);
+}
+
+/* Dark variant — same clean pill, slightly stronger drop shadow against
+   the dark wrapper bg. */
+.cta-flow.on-dark {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.20) inset,
+    0 -1px 0 rgba(20, 17, 15, 0.20) inset,
+    0 8px 22px -6px rgba(233, 80, 77, 0.55);
+}
+.cta-flow.on-dark:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.20) inset,
+    0 -1px 0 rgba(20, 17, 15, 0.20) inset,
+    0 12px 28px -6px rgba(233, 80, 77, 0.70);
+}
+
+/* Breathing pulse inside the CTA on hover */
+.cta-flow-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 232, 211, 0.55) 0%,
+    rgba(255, 213, 179, 0.25) 40%,
+    transparent 70%
+  );
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 240ms ease;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.cta-flow:hover .cta-flow-pulse {
+  opacity: 1;
+  animation: cta-breathe 2.4s ease-in-out infinite;
+}
+@keyframes cta-breathe {
+  0%, 100% { transform: scale(0.78); opacity: 0.55; }
+  50%      { transform: scale(1.15); opacity: 1; }
+}
+
+/* =========================================================
+   Theme-adaptive check bullet (Consolidation section)
+   Light-peach container + coral check in light mode (inline default).
+   Translucent persimmon container + brighter persimmon icon in dark.
+   The 900ms transitions match the wrapper's bg/color fade so the
+   bullet swaps along with the theme.
+   ========================================================= */
+[data-theme="dark"] .check-bullet {
+  background: rgba(233, 80, 77, 0.18) !important;
+}
+.check-bullet-icon {
+  transition: stroke 900ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="dark"] .check-bullet-icon {
+  color: var(--persimmon-400) !important;
+  stroke: var(--persimmon-400) !important;
+}
+
+/* =========================================================
+   Theme-adaptive outcome panel border (Customer Outcomes)
+   In light mode: default T.hairline (#E7E7EB) — set inline.
+   In dark mode: lighter midnight gray (#2A2A35) so the card
+   edges read clearly against the dark wrapper bg. The wrapper's
+   theme transitions over 900ms so the border swap is in lockstep.
+   ========================================================= */
+[data-theme="dark"] .outcome-panel {
+  border-color: #2A2A35 !important;
+}
+
+/* Sticky scroll · step content fade-in when step index changes */
+@keyframes step-fade {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================================
+   Logo carousel · infinite marquee
+   ========================================================= */
+.logo-marquee {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation: logo-marquee 38s linear infinite;
+}
+.logo-marquee:hover { animation-play-state: paused; }
+
+@keyframes logo-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* =========================================================
+   Reduced motion · turn off CTA hover pulse + reveal anims
+   ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .cta-flow:hover .cta-flow-pulse { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
