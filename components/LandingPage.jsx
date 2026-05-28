@@ -633,12 +633,13 @@ function Hero() {
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          paddingTop: 72,
+          paddingTop: 32,
           paddingBottom: 32,
         }}
       >
-        {/* Top stack: headline + description + CTA row */}
-        <div>
+        {/* Headline / description / CTA — vertically centered between the
+            header bottom and the logo strip via auto margins above + below. */}
+        <div style={{ marginTop: "auto", marginBottom: "auto" }}>
           <Reveal>
             <h1
               style={{
@@ -699,10 +700,10 @@ function Hero() {
           </Reveal>
         </div>
 
-        {/* Logo section pinned to the bottom of the hero via marginTop:auto.
-            The Container's paddingBottom:32 keeps it 32px above the section
-            edge — which on initial load matches the viewport bottom edge. */}
-        <div style={{ marginTop: "auto", paddingTop: 48 }}>
+        {/* Logo section — sits at the bottom of the flex column. The title
+            block's auto margins push it down here; Container's paddingBottom:32
+            keeps it 32px above the viewport's bottom edge. */}
+        <div style={{ paddingTop: 48 }}>
           <Reveal>
             <div
               style={{
