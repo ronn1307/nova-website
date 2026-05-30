@@ -98,12 +98,134 @@ body {
 }
 
 /* =========================================================
-   CTA · clean persimmon pill
-   The rotating conic-gradient ring caused sub-pixel corner leaks
-   that mask + clip-path couldn't fully resolve. The flow effect
-   is now retired in favor of a clean static pill: solid coral fill,
-   subtle inset top highlight for depth, and a coral-tinted drop
-   shadow for the floating-button feel.
+   Ghost link CTA (used in Hero next to "Book a demo")
+   • Default: ink-colored label, no arrow visible.
+   • Hover: whole link scales 1.04; persimmon fill rises bottom→top
+     across the text via a duplicated ::after with clip-path; the
+     trailing arrow slides in from -8px and fades up.
+   ========================================================= */
+.ghost-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  /* currentColor inherits the wrapper theme — ink in light, whisper in dark. */
+  color: currentColor;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ghost-link:hover {
+  transform: scale(1.04);
+}
+
+/* The text — duplicated via ::after with clip-path so persimmon fills
+   bottom→top on hover without abrupt color jumps. */
+.ghost-link-text {
+  position: relative;
+  display: inline-block;
+  color: currentColor;
+}
+.ghost-link-text::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: var(--persimmon-600);
+  clip-path: inset(100% 0 0 0);
+  -webkit-clip-path: inset(100% 0 0 0);
+  pointer-events: none;
+  transition:
+    clip-path 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    -webkit-clip-path 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ghost-link:hover .ghost-link-text::after {
+  clip-path: inset(0 0 0 0);
+  -webkit-clip-path: inset(0 0 0 0);
+}
+
+/* Trailing arrow — hidden by default, slides in + fades up on hover. */
+.ghost-link-arrow {
+  display: inline-flex;
+  align-items: center;
+  color: var(--persimmon-600);
+  opacity: 0;
+  transform: translateX(-8px);
+  width: 0;            /* doesn't take horizontal space at rest */
+  overflow: hidden;
+  transition:
+    opacity 240ms ease,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ghost-link:hover .ghost-link-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  width: 18px;         /* matches icon width */
+}
+
+/* =========================================================
+   SHARED · Button primary (SpiceKit gradient) — size-agnostic
+   Used by Nav + Footer + any compact "Book a demo" CTA. Padding +
+   font-size come from inline style on the call-site so the same
+   class works at sm (Nav scrolled) and md (Nav unscrolled + Footer).
+   ========================================================= */
+.btn-gradient-primary {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background:
+    linear-gradient(180deg, #F17857 0%, #E9504D 100%) padding-box,
+    linear-gradient(180deg, #FFFFFF 0%, #E9504D 100%) border-box;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition:
+    transform 220ms cubic-bezier(0.2, 0, 0, 1),
+    background 220ms ease,
+    box-shadow 260ms ease;
+  box-shadow:
+    0 0 0 1px #BC3C39,
+    0 4px 12px -6px rgba(188, 60, 57, 0.32);
+}
+.btn-gradient-primary:hover {
+  transform: translateY(-1px);
+  background:
+    linear-gradient(180deg, #F9A060 0%, #F17857 100%) padding-box,
+    linear-gradient(180deg, #FFFFFF 0%, #F17857 100%) border-box;
+  box-shadow:
+    0 0 0 1px #BC3C39,
+    0 8px 20px -8px rgba(188, 60, 57, 0.48);
+}
+.btn-gradient-primary:active {
+  transform: translateY(0);
+  background:
+    linear-gradient(180deg, #E9504D 0%, #BC3C39 100%) padding-box,
+    linear-gradient(180deg, #FFFFFF 0%, #BC3C39 100%) border-box;
+  box-shadow:
+    0 0 0 1px #8E2C2A,
+    0 3px 8px -4px rgba(142, 44, 42, 0.45);
+}
+.btn-gradient-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px #BC3C39,
+    0 0 0 4px rgba(252, 201, 176, 0.55),
+    0 4px 12px -6px rgba(188, 60, 57, 0.32);
+}
+
+/* =========================================================
+   CTA · SpiceKit gradient pill (mirrors Figma Button/Primary/lg)
+   Vertical gradient bg (persimmon-500 → 600), gradient stroke
+   (white at top → bg-end at bottom for the glassy edge), and a
+   0/0/0/1px drop shadow for the soft outer outline. Hover steps
+   the gradient one shade lighter; pressed steps it darker.
+   Padding/sizes match button/lg in Figma exactly:
+     lg = 48h, padX 24, padR-icon 20, padY 12, gap 8, label 16/24
    ========================================================= */
 .cta-flow {
   position: relative;
@@ -111,62 +233,66 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 13px 22px;
-  border: none;
+  padding: 12px 20px 12px 24px; /* matches lg variant with trailing icon */
+  border: 1px solid transparent; /* gradient border injected via background-clip */
   border-radius: 9999px;
-  background: var(--persimmon-600);
+  background:
+    linear-gradient(180deg, #F17857 0%, #E9504D 100%) padding-box,           /* fill */
+    linear-gradient(180deg, #FFFFFF 0%, #E9504D 100%) border-box;            /* stroke */
   color: #FFFFFF;
   font-family: var(--font-inter), Inter, sans-serif;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 24px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   cursor: pointer;
-  overflow: hidden; /* keep any future inner effects pill-bound */
+  overflow: visible;
   transition:
     transform 220ms cubic-bezier(0.2, 0, 0, 1),
     background 220ms ease,
     box-shadow 260ms ease;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 -1px 0 rgba(20, 17, 15, 0.12) inset,
-    0 6px 18px -8px rgba(233, 80, 77, 0.38);
-}
-
-/* Inner top highlight — adds a subtle glassy depth without a ring. */
-.cta-flow::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 48%);
-  pointer-events: none;
+    0 0 0 1px #BC3C39, /* outline · acts like an extra ring around the pill */
+    0 6px 18px -8px rgba(188, 60, 57, 0.42); /* lifted feel */
 }
 
 .cta-flow:hover {
   transform: translateY(-1px);
-  background: #EE5A57; /* slightly brighter coral on hover */
+  background:
+    linear-gradient(180deg, #F9A060 0%, #F17857 100%) padding-box,
+    linear-gradient(180deg, #FFFFFF 0%, #F17857 100%) border-box;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 -1px 0 rgba(20, 17, 15, 0.12) inset,
-    0 10px 24px -8px rgba(233, 80, 77, 0.48);
+    0 0 0 1px #BC3C39,
+    0 10px 24px -8px rgba(188, 60, 57, 0.55);
 }
 .cta-flow:active {
   transform: translateY(0);
+  background:
+    linear-gradient(180deg, #E9504D 0%, #BC3C39 100%) padding-box,
+    linear-gradient(180deg, #FFFFFF 0%, #BC3C39 100%) border-box;
+  box-shadow:
+    0 0 0 1px #8E2C2A,
+    0 4px 12px -6px rgba(142, 44, 42, 0.55);
+}
+.cta-flow:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px #BC3C39,
+    0 0 0 5px rgba(252, 201, 176, 0.6), /* persimmon-200 ring */
+    0 6px 18px -8px rgba(188, 60, 57, 0.42);
 }
 
-/* Dark variant — same clean pill, slightly stronger drop shadow against
-   the dark wrapper bg. */
+/* Dark variant — same gradient, brighter ring color */
 .cta-flow.on-dark {
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.20) inset,
-    0 -1px 0 rgba(20, 17, 15, 0.20) inset,
-    0 8px 22px -6px rgba(233, 80, 77, 0.55);
+    0 0 0 1px #BC3C39,
+    0 8px 22px -6px rgba(0, 0, 0, 0.45);
 }
-.cta-flow.on-dark:hover {
+.cta-flow.on-dark:focus-visible {
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.20) inset,
-    0 -1px 0 rgba(20, 17, 15, 0.20) inset,
-    0 12px 28px -6px rgba(233, 80, 77, 0.70);
+    0 0 0 1px #BC3C39,
+    0 0 0 5px rgba(188, 60, 57, 0.55),
+    0 8px 22px -6px rgba(0, 0, 0, 0.45);
 }
 
 /* Breathing pulse inside the CTA on hover */
@@ -234,12 +360,101 @@ body {
 /* =========================================================
    Logo carousel · infinite marquee
    ========================================================= */
+/* =========================================================
+   Hero · theme-aware vignette overlays
+   Two layers stacked (light + dark). The wrapper's [data-theme]
+   attribute drives their opacity, with a 900ms transition that matches
+   the wrapper's bg fade — so during the scroll-theme handoff the
+   Hero's vignette transitions in lockstep with the wrapper bg.
+   ========================================================= */
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+.hero-vignette-light {
+  opacity: 1;
+  background:
+    linear-gradient(180deg,
+      #FAFAFB 0%,
+      rgba(250,250,251,0) 16%,
+      rgba(250,250,251,0) 55%,
+      #FAFAFB 88%,
+      #FAFAFB 100%),
+    linear-gradient(90deg,
+      #FAFAFB 0%,
+      rgba(250,250,251,0) 12%,
+      rgba(250,250,251,0) 88%,
+      #FAFAFB 100%);
+}
+.hero-vignette-dark {
+  opacity: 0;
+  background:
+    linear-gradient(180deg,
+      #171721 0%,
+      rgba(23,23,33,0) 16%,
+      rgba(23,23,33,0) 55%,
+      #171721 88%,
+      #171721 100%),
+    linear-gradient(90deg,
+      #171721 0%,
+      rgba(23,23,33,0) 12%,
+      rgba(23,23,33,0) 88%,
+      #171721 100%);
+}
+[data-theme="dark"] .hero-vignette-light { opacity: 0; }
+[data-theme="dark"] .hero-vignette-dark  { opacity: 1; }
+
+/* =========================================================
+   Logo carousel · theme-aware edge fades
+   Same crossfade pattern: light + dark layer per side, [data-theme]
+   drives the opacity, 900ms transition matches the wrapper fade.
+   ========================================================= */
+.logo-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 160px;
+  z-index: 2;
+  pointer-events: none;
+  transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+.logo-fade-left  { left: 0; }
+.logo-fade-right { right: 0; }
+.logo-fade-light { opacity: 1; }
+.logo-fade-dark  { opacity: 0; }
+.logo-fade-left.logo-fade-light  { background: linear-gradient(90deg,  #FAFAFB 0%, rgba(250,250,251,0) 100%); }
+.logo-fade-right.logo-fade-light { background: linear-gradient(270deg, #FAFAFB 0%, rgba(250,250,251,0) 100%); }
+.logo-fade-left.logo-fade-dark   { background: linear-gradient(90deg,  #171721 0%, rgba(23,23,33,0)   100%); }
+.logo-fade-right.logo-fade-dark  { background: linear-gradient(270deg, #171721 0%, rgba(23,23,33,0)   100%); }
+[data-theme="dark"] .logo-fade-light { opacity: 0; }
+[data-theme="dark"] .logo-fade-dark  { opacity: 1; }
+
+/*
+ * Seamless marquee.
+ *
+ * The previous build used `gap: 44px` on the flex track. Flex gap only sits
+ * BETWEEN items, so the total track width was 2N*W + (2N-1)*gap — but the
+ * loop needs the track width to be 2N*(W + gap) for translateX(-50%) to land
+ * exactly on the start of the duplicated set. The mismatch (gap/2 = 22px)
+ * showed up as a visible "jump" each cycle.
+ *
+ * Fix: drop flex-gap. Each item gets `padding-right: 56px` (the new logo
+ * gap = 44 + 12 per spec). Now every item contributes the same fixed
+ * trailing space, so the track is a clean 2N*(W + 56) wide and the loop
+ * lands pixel-perfectly on every cycle.
+ */
 .logo-marquee {
   display: flex;
-  gap: 12px;
+  align-items: center;
   width: max-content;
   animation: logo-marquee 38s linear infinite;
 }
+.logo-marquee > * { padding-right: 56px; }
 .logo-marquee:hover { animation-play-state: paused; }
 
 @keyframes logo-marquee {

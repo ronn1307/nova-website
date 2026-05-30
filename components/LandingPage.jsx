@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { T, FONT_DISPLAY, FONT_BODY, FONT_MONO } from "@/lib/tokens";
 import { useScrollY, useSectionProgress, useScrollTheme, useMouseParallax } from "@/lib/hooks";
+import LottiePlayer from "./LottiePlayer";
+import NovaDotfield from "./NovaDotfield";
 
 // =========================================================
 //  SHARED PRIMITIVES
@@ -116,46 +118,59 @@ function Body({ children, color = T.inkMuted, size = 17, style }) {
 }
 
 function Button({ children, variant = "primary", onClick, style, arrow = false }) {
+  // Base layout/typography — works at every size. Padding + font-size are
+  // overridable via the `style` prop on the call-site (Nav scrolled state
+  // passes 8/16 + fontSize 14 → sm; default = md scale).
   const base = {
     fontFamily: FONT_BODY,
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: "20px",
     fontWeight: 500,
-    letterSpacing: "-0.01em",
-    padding: "13px 22px",
+    letterSpacing: "-0.005em",
+    padding: "10px 20px",
     borderRadius: 999,
     border: "none",
     cursor: "pointer",
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
-    transition: "all 200ms cubic-bezier(0.2, 0, 0, 1)",
   };
+  // Variant-specific inline styles. Note: `primary` keeps `color: #FFFFFF`
+  // here but bg/box-shadow live in `.btn-gradient-primary` CSS so the
+  // SpiceKit gradient + hover/active/focus states are applied uniformly.
   const variants = {
     primary: {
-      background: T.persimmon600,
-      color: T.surface,
-      boxShadow: "0 1px 0 0 rgba(20,17,15,0.06), 0 0 0 1px rgba(188,60,57,0.40) inset",
+      color: "#FFFFFF",
     },
     secondary: {
       background: T.mist,
       color: T.ink,
       boxShadow: "0 0 0 1px rgba(20,17,15,0.06) inset",
+      transition: "all 200ms cubic-bezier(0.2, 0, 0, 1)",
     },
     ghost: {
       background: "transparent",
       color: T.ink,
       boxShadow: "0 0 0 1px rgba(20,17,15,0.18) inset",
+      transition: "all 200ms cubic-bezier(0.2, 0, 0, 1)",
     },
     invertGhost: {
       background: "rgba(255,255,255,0.04)",
       color: T.whisper,
       boxShadow: "0 0 0 1px rgba(255,255,255,0.18) inset",
+      transition: "all 200ms cubic-bezier(0.2, 0, 0, 1)",
     },
   };
+  const className = variant === "primary" ? "btn-gradient-primary" : undefined;
   return (
-    <button onClick={onClick} style={{ ...base, ...variants[variant], ...style }}>
+    <button
+      onClick={onClick}
+      className={className}
+      style={{ ...base, ...variants[variant], ...style }}
+    >
       {children}
-      {arrow && <ArrowRight size={15} strokeWidth={2} />}
+      {arrow && <ArrowRight size={16} strokeWidth={2} />}
     </button>
   );
 }
@@ -287,17 +302,145 @@ function SoftGlow({ color = T.persimmon500, position = "top-right", opacity = 0.
 }
 
 // =========================================================
-//  REVEAL — scroll-in / scroll-out mask + lift animation
-//  Wraps any block; animates clip-path + translateY + opacity.
-//  Bidirectional: re-animates if the element leaves & re-enters view.
+//  SHARED REVEAL TIMING
+//  Single source of truth for duration + easing so every reveal in the
+//  page moves in lockstep. Change here, the whole site re-tunes.
+// =========================================================
+const REVEAL_DURATION = 800;
+const REVEAL_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+// Stagger budget for grids: per-child delay × number of children should
+// stay under this to keep the cascade snappy. We clamp inside StaggerGroup.
+const STAGGER_BUDGET_MS = 480;
+
+// =========================================================
+//  PREFERS-REDUCED-MOTION
+//  Honours the user's OS-level "reduce motion" setting. When true, every
+//  reveal component renders at its visible end-state with zero transition
+//  duration so nothing animates. Initial value tracks SSR safely.
+// =========================================================
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = (e) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+// =========================================================
+//  SCROLL REVEAL — the universal primitive
+//  Bidirectional fade + lift driven by IntersectionObserver. Use this for
+//  90% of content: section labels, body copy, descriptions, diagrams,
+//  any block that doesn't need a mask curtain.
+//
+//    - Enters viewport → fade 0→1, translateY(lift)→0 over REVEAL_DURATION
+//    - Leaves viewport → fade 1→0, translateY(0)→translateY(lift) same
+//    - prefers-reduced-motion → instant final state, no transition
+// =========================================================
+function ScrollReveal({
+  children,
+  delay = 0,
+  duration = REVEAL_DURATION,
+  threshold = 0.12,
+  rootMargin = "0px 0px -8% 0px",
+  lift = 24,
+  as: Tag = "div",
+  style,
+}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) {
+      setVisible(true);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { threshold, rootMargin }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [threshold, rootMargin, reduced]);
+
+  const transition = reduced
+    ? "none"
+    : `opacity ${duration}ms ${REVEAL_EASE} ${delay}ms,
+       transform ${duration}ms ${REVEAL_EASE} ${delay}ms`;
+
+  return (
+    <Tag
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : `translateY(${lift}px)`,
+        transition,
+        willChange: reduced ? "auto" : "opacity, transform",
+        ...style,
+      }}
+    >
+      {children}
+    </Tag>
+  );
+}
+
+// =========================================================
+//  STAGGER GROUP — cascading reveals for grids/lists
+//  Wraps a list of children and applies an incremental delay per child via
+//  React.cloneElement. Children should be reveal components that accept a
+//  `delay` prop (ScrollReveal, BiMaskReveal, FadeReveal). The per-item
+//  delay is clamped so even big grids don't drag out.
+//
+//  Usage:
+//    <StaggerGroup>
+//      {cards.map(c => <ScrollReveal key={c.id}>{c.content}</ScrollReveal>)}
+//    </StaggerGroup>
+// =========================================================
+function StaggerGroup({ children, perItemDelay = 80, baseDelay = 0, as: Tag = "div", style }) {
+  const items = React.Children.toArray(children);
+  // Cap the per-item delay so very large grids don't push the last item
+  // past the stagger budget.
+  const safeDelay = items.length > 1
+    ? Math.min(perItemDelay, STAGGER_BUDGET_MS / Math.max(items.length - 1, 1))
+    : 0;
+  return (
+    <Tag style={style}>
+      {items.map((child, i) => {
+        if (!React.isValidElement(child)) return child;
+        const childDelay = child.props?.delay ?? 0;
+        return React.cloneElement(child, {
+          delay: baseDelay + childDelay + Math.round(i * safeDelay),
+        });
+      })}
+    </Tag>
+  );
+}
+
+// =========================================================
+//  REVEAL (legacy one-shot) — scroll-in mask + lift animation
+//  Kept for backward compatibility with sections that haven't migrated to
+//  ScrollReveal yet. New code should prefer ScrollReveal.
 // =========================================================
 function Reveal({ children, delay = 0, direction = "up", as: Tag = "div", style }) {
   const ref = useRef(null);
   const [seen, setSeen] = useState(false);
+  // After the reveal transition finishes we drop clip-path entirely. The
+  // clip-path inset(0 0 0 0) — even when fully open — still clips at the
+  // element's bounds, which cuts CTA outer shadows / focus rings. Removing
+  // the clip-path post-transition gives outer shadows room to render.
+  const [revealDone, setRevealDone] = useState(false);
 
   useEffect(() => {
     // Failsafe: always show after 700ms regardless of observer state.
-    // Content can NEVER be permanently hidden by a stuck clip-path.
     const safety = setTimeout(() => setSeen(true), 700);
 
     if (typeof IntersectionObserver === "undefined") {
@@ -324,19 +467,32 @@ function Reveal({ children, delay = 0, direction = "up", as: Tag = "div", style 
     };
   }, []);
 
+  // Once we've been seen, schedule clip-path removal after the longest
+  // transition (clip-path 1000ms + delay + a small buffer).
+  useEffect(() => {
+    if (!seen) return;
+    const t = setTimeout(() => setRevealDone(true), 1000 + delay + 50);
+    return () => clearTimeout(t);
+  }, [seen, delay]);
+
   const offset = direction === "down" ? "-28px" : direction === "none" ? "0" : "28px";
+  const clipValue = revealDone
+    ? "none"
+    : seen
+    ? "inset(0 0 0 0)"
+    : "inset(0 0 100% 0)";
 
   return (
     <Tag
       ref={ref}
       style={{
         // Triple-layer reveal: opacity fade + translateY lift + clip-path mask
-        // (bottom-up). The mask gives the dramatic "unveil from below" feel;
-        // the lift adds vertical motion; opacity catches any edge cases.
+        // (bottom-up). After the transition completes, clip-path drops to
+        // `none` so any outer shadows on contained CTAs can extend freely.
         opacity: seen ? 1 : 0,
         transform: seen ? "translateY(0)" : `translateY(${offset})`,
-        clipPath: seen ? "inset(0 0 0 0)" : "inset(0 0 100% 0)",
-        WebkitClipPath: seen ? "inset(0 0 0 0)" : "inset(0 0 100% 0)",
+        clipPath: clipValue,
+        WebkitClipPath: clipValue,
         transition: `opacity 700ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
                      transform 900ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
                      clip-path 1000ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms,
@@ -351,86 +507,311 @@ function Reveal({ children, delay = 0, direction = "up", as: Tag = "div", style 
 }
 
 // =========================================================
+//  BIDIRECTIONAL MASK REVEAL
+//  Bottom-up reveal when the element enters the viewport, top-down hide
+//  when it leaves — the curtain follows the direction of scroll naturally.
+//
+//  Implementation: clip-path animates between
+//    "inset(100% 0 0 0)"  (top edge clipped → nothing visible)
+//    "inset(0 0 0 0)"     (no clip → fully visible)
+//  Both directions share the same easing, so reveal & hide feel like
+//  one symmetric motion.
+//
+//  Use `revealKey` to force a re-trigger when content changes mid-section
+//  (e.g. phase advances in SystemsThatNeverSpoke / step changes in
+//  HowItWorks). Passing a new key remounts the inner subtree and replays
+//  the entry animation cleanly.
+// =========================================================
+function BiMaskReveal({
+  children,
+  delay = 0,
+  // Longer duration + ease-out-expo so the curtain feels like it's
+  // settling rather than snapping. The trailing tail of the curve does
+  // the work — the dominant motion is in the first ~40% of the duration,
+  // then the rest is a gentle slow-down.
+  duration = 1000,
+  threshold = 0.15,
+  as: Tag = "div",
+  style,
+}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) {
+      setVisible(true);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { threshold, rootMargin: "0px 0px -10% 0px" }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [threshold, reduced]);
+
+  // Bottom-up reveal: top inset goes 100% → 0% (mask recedes upward).
+  // Top-down hide:    top inset goes 0% → 100% (mask covers from the top).
+  const clipValue = visible ? "inset(0 0 0 0)" : "inset(100% 0 0 0)";
+
+  // Two-layer structure is *required*. IntersectionObserver's
+  // intersectionRect respects clip-path on the observed element, so if we
+  // put clip-path on the ref'd node it starts with 0 visible area, never
+  // reports isIntersecting=true, and the reveal never fires. The outer Tag
+  // stays unclipped (so the observer sees its real layout box); the inner
+  // span carries the clip-path + opacity animation.
+  return (
+    <Tag
+      ref={ref}
+      style={{ display: "block", ...style }}
+    >
+      <span
+        style={{
+          display: "block",
+          clipPath: clipValue,
+          WebkitClipPath: clipValue,
+          opacity: visible ? 1 : 0,
+          // Ease-out-expo: long settle at the end. Opacity catches up at
+          // ~75% of the clip duration so the text fades fully in slightly
+          // ahead of the mask closing, removing any "ghosted edge" feel.
+          transition: reduced
+            ? "none"
+            : `clip-path ${duration}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms,
+               -webkit-clip-path ${duration}ms cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms,
+               opacity ${Math.round(duration * 0.75)}ms ${REVEAL_EASE} ${delay}ms`,
+          willChange: reduced ? "auto" : "clip-path, opacity",
+        }}
+      >
+        {children}
+      </span>
+    </Tag>
+  );
+}
+
+// =========================================================
+//  FADE REVEAL
+//  Opacity + small lift only. No clip-path, no overflow:hidden — so
+//  contained elements with outer shadows / 1px rings (FlowCTA in
+//  particular) don't get clipped. Use this for buttons/CTAs while the
+//  surrounding text uses BiMaskReveal.
+// =========================================================
+function FadeReveal({
+  children,
+  delay = 0,
+  duration = REVEAL_DURATION,
+  threshold = 0.15,
+  lift = 16,
+  as: Tag = "div",
+  style,
+}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) {
+      setVisible(true);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { threshold, rootMargin: "0px 0px -10% 0px" }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [threshold, reduced]);
+
+  return (
+    <Tag
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : `translateY(${lift}px)`,
+        transition: reduced
+          ? "none"
+          : `opacity ${duration}ms ${REVEAL_EASE} ${delay}ms,
+             transform ${duration}ms ${REVEAL_EASE} ${delay}ms`,
+        willChange: reduced ? "auto" : "opacity, transform",
+        ...style,
+      }}
+    >
+      {children}
+    </Tag>
+  );
+}
+
+// =========================================================
+//  PHASE TRANSITION — crossfade between content versions
+//  When phaseKey changes, the outgoing layer fades to opacity 0 while a
+//  fresh incoming layer (with its own BiMaskReveal animations inside)
+//  mounts and reveals. They share the same absolute slot so they overlap
+//  during the transition — replacing the harsh "old → blank → new" snap
+//  with a soft handoff.
+// =========================================================
+function PhaseTransition({ phaseKey, duration = 700, children }) {
+  const [layers, setLayers] = useState(() => [
+    { id: 0, key: phaseKey, children },
+  ]);
+  const nextId = useRef(1);
+
+  useEffect(() => {
+    setLayers((prev) => {
+      const latest = prev[prev.length - 1];
+      if (latest.key === phaseKey) return prev;
+      // Snapshot the OUTGOING layer's children at the moment of transition
+      // so it keeps rendering its old content during fade-out.
+      return [
+        ...prev.map((l) => ({ ...l })),
+        { id: nextId.current++, key: phaseKey, children },
+      ];
+    });
+
+    const cleanup = setTimeout(() => {
+      setLayers((prev) => (prev.length > 1 ? prev.slice(-1) : prev));
+    }, duration + 120);
+    return () => clearTimeout(cleanup);
+  }, [phaseKey, duration]);
+
+  return (
+    <div style={{ position: "relative" }}>
+      {layers.map((layer, i) => {
+        const isLatest = i === layers.length - 1;
+        return (
+          <div
+            key={layer.id}
+            style={{
+              position: isLatest ? "relative" : "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              opacity: isLatest ? 1 : 0,
+              transition: `opacity ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+              pointerEvents: isLatest ? "auto" : "none",
+            }}
+          >
+            {/* Latest layer uses the live `children` prop so any in-render
+                updates (e.g. CTA hover state) flow through. Older layers
+                keep their captured children for the fade-out. */}
+            {isLatest ? children : layer.children}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =========================================================
 //  FLOW CTA — coral primary with rotating gradient glow edge
 //  Animation lives in globals.css under .cta-flow
 // =========================================================
-function FlowCTA({ children, onDark = false, onClick, arrow = true, style }) {
+function FlowCTA({ children, onDark = false, onClick, arrow = true, lottieSrc, style }) {
+  // Maps to Figma Button/Primary/lg/Trailing — gradient bg + gradient stroke +
+  // 1px outline shadow + 18px trailing icon. Padding is set in .cta-flow CSS.
+  //
+  // When `lottieSrc` is passed, the static ArrowRight is hidden and the
+  // Lottie is overlaid as an ABSOLUTE LAYER covering the entire CTA
+  // (inset:0, width:100%, height:100%). The Lottie's canvas was authored
+  // at button-equivalent dimensions (147×48), so its transparent areas let
+  // the gradient bg + label below show through while the animated trailing
+  // element plays on top. Pointer events pass through to the button.
   return (
     <button
       onClick={onClick}
       className={`cta-flow${onDark ? " on-dark" : ""}`}
       style={style}
     >
-      <span className="cta-flow-pulse" aria-hidden />
       <span style={{ position: "relative", zIndex: 2, display: "inline-flex", alignItems: "center", gap: 8 }}>
         {children}
-        {arrow && <ArrowRight size={15} strokeWidth={2} />}
+        {arrow && <ArrowRight size={18} strokeWidth={2} />}
       </span>
+      {lottieSrc && (
+        <LottiePlayer
+          src={lottieSrc}
+          loop
+          autoplay
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 3,
+          }}
+        />
+      )}
     </button>
   );
 }
 
 // =========================================================
 //  LOGO CAROUSEL — infinite marquee with edge fades (Stripe-pattern)
+//  Edge fades are dual-layer (light + dark) and crossfade via opacity driven
+//  by [data-theme] on the wrapper — so the fades blend correctly even mid
+//  scroll-theme transition. No bgFade prop needed.
 // =========================================================
-function LogoCarousel({ bgFade = "var(--canvas)" }) {
+function LogoCarousel() {
+  // Brand list — Tram, SliceShabu, and LA's Hot Chicken now ship as proper
+  // SVG logos (svgSrc); the rest still render as styled wordmark pills until
+  // their logos land.
   const logos = [
-    { name: "TRAM",             color: T.persimmon600 },
-    { name: "HYBRID",           color: T.midnight },
-    { name: "SLICE",            color: T.ink },
-    { name: "KK's Hot Chicken", color: T.persimmon600 },
-    { name: "Butter",           color: T.matcha600 },
-    { name: "Sofia's",          color: T.nebula600 },
-    { name: "Bayou Bistro",     color: T.cobalt600 },
+    { name: "Tram Cream Coffee", color: T.persimmon600, svgSrc: "/brands/tram.svg",            svgHeight: 24 },
+    { name: "HYBRID",            color: T.mb800 },
+    { name: "SliceShabu",        color: T.ink,          svgSrc: "/brands/sliceshabu.svg",      svgHeight: 28 },
+    { name: "LA's Hot Chicken",  color: T.persimmon600, svgSrc: "/brands/las-hot-chicken.svg", svgHeight: 32 },
+    { name: "Butter",            color: T.matcha600 },
+    { name: "Sofia's",           color: T.nebula600 },
+    { name: "Bayou Bistro",      color: T.cobalt600 },
   ];
   // Duplicate the set so the marquee loops seamlessly at translateX(-50%)
   const items = [...logos, ...logos];
   return (
     <div style={{ position: "relative", overflow: "hidden", padding: "10px 0" }}>
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 160,
-          background: `linear-gradient(90deg, ${bgFade} 0%, transparent 100%)`,
-          pointerEvents: "none",
-          zIndex: 2,
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: 160,
-          background: `linear-gradient(270deg, ${bgFade} 0%, transparent 100%)`,
-          pointerEvents: "none",
-          zIndex: 2,
-        }}
-      />
+      {/* Left edge — two layers crossfaded by [data-theme]. */}
+      <div className="logo-fade logo-fade-left logo-fade-light" aria-hidden />
+      <div className="logo-fade logo-fade-left logo-fade-dark"  aria-hidden />
+      {/* Right edge — same pattern. */}
+      <div className="logo-fade logo-fade-right logo-fade-light" aria-hidden />
+      <div className="logo-fade logo-fade-right logo-fade-dark"  aria-hidden />
+      {/* Per-item padding-right (56px) is owned by the .logo-marquee CSS so
+          the duplicated track is exactly 2× the visible loop — no seam jump
+          at translateX(-50%). See globals.css for the rationale. */}
       <div className="logo-marquee">
         {items.map((logo, i) => (
           <div
             key={i}
             style={{
-              padding: "12px 28px",
-              borderRadius: 999,
-              border: `1px solid ${T.hairline}`,
-              background: T.surface,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: 44,
               color: logo.color,
-              fontSize: 17,
+              fontSize: 16,
+              lineHeight: "24px",
               fontWeight: 600,
               letterSpacing: "-0.02em",
               whiteSpace: "nowrap",
               flexShrink: 0,
             }}
+            aria-label={logo.name}
           >
-            {logo.name}
+            {logo.svgSrc ? (
+              <img
+                src={logo.svgSrc}
+                alt={logo.name}
+                style={{ height: 44, width: "auto", display: "block" }}
+              />
+            ) : (
+              logo.name
+            )}
           </div>
         ))}
       </div>
@@ -578,7 +959,8 @@ function Nav({ theme = "light" }) {
               </a>
             ))}
           </nav>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* 24px gap between Sign in and Book a demo per 4pt grid */}
+          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <a
               href="#"
               style={{
@@ -591,7 +973,15 @@ function Nav({ theme = "light" }) {
             >
               Sign in
             </a>
-            <Button variant="primary" style={{ padding: scrolled ? "8px 16px" : "10px 18px", fontSize: 14 }}>
+            <Button
+              variant="primary"
+              style={{
+                // 4pt grid — Figma button/sm = 36h (padY 8, padX 16), button/md = 40h (padY 8, padX 20)
+                padding: scrolled ? "8px 16px" : "8px 20px",
+                fontSize: 14,
+                lineHeight: "20px",
+              }}
+            >
               Book a demo
             </Button>
           </div>
@@ -615,6 +1005,12 @@ function Hero() {
     // viewport's bottom edge. overflow:visible keeps the gradient flowing
     // behind the transparent header.
     <section
+      // Hero's OWN theme is light — that's what useScrollTheme reads when
+      // Hero is in view. But the wrapper takes 900ms to fade dark→light
+      // when scrolling up from the AI section, and during that window we
+      // don't want a pure-light Hero sitting in front of a still-dark
+      // wrapper. So the visuals below (dotfield bg, vignette, logo fades)
+      // passively follow the wrapper theme via [data-theme] crossfades.
       data-section-theme="light"
       style={{
         position: "relative",
@@ -625,7 +1021,17 @@ function Hero() {
         overflow: "visible",
       }}
     >
-      <HeroFlowVisual />
+      {/* WebGL cursor-vacuum dot grid. Canvas is transparent — the wrapper's
+          bg shows through and transitions naturally. */}
+      <NovaDotfield />
+      {/* Two layered vignettes — one for each theme — crossfade via opacity
+          driven by [data-theme] on the wrapper. Gradient colors can't
+          transition, but opacity can, so this gives a smooth 900ms blend
+          that stays in lockstep with the wrapper's bg transition.
+          The bottom band stays taller in both so the logo strip sits on
+          solid canvas regardless of which theme is active. */}
+      <div className="hero-vignette hero-vignette-light" aria-hidden />
+      <div className="hero-vignette hero-vignette-dark" aria-hidden />
       <Container
         style={{
           position: "relative",
@@ -640,7 +1046,7 @@ function Hero() {
         {/* Headline / description / CTA — vertically centered between the
             header bottom and the logo strip via auto margins above + below. */}
         <div style={{ marginTop: "auto", marginBottom: "auto" }}>
-          <Reveal>
+          <ScrollReveal>
             <h1
               style={{
                 fontFamily: FONT_DISPLAY,
@@ -648,22 +1054,29 @@ function Hero() {
                 lineHeight: 1.08,
                 letterSpacing: "-0.028em",
                 fontWeight: 500,
-                color: T.ink,
+                // currentColor inherits the wrapper's transitioning text color.
+                // When wrapper is light: ink. When the wrapper is still dark
+                // mid-scroll: whisper. Avoids a hard-coded light value clashing
+                // with the wrapper during the 900ms theme transition.
+                color: "currentColor",
                 margin: "0",
                 maxWidth: 880,
               }}
             >
               The unified <span style={{ color: T.persimmon600 }}>AI-native</span> platform for restaurant operations.
             </h1>
-          </Reveal>
+          </ScrollReveal>
 
-          <Reveal delay={160}>
+          <ScrollReveal delay={160}>
             <p
               style={{
                 fontFamily: FONT_BODY,
                 fontSize: 16,
-                lineHeight: 1.55,
-                color: T.inkMuted,
+                lineHeight: 1.56, // matches Figma body/16 (156%)
+                // Same reasoning as h1 — currentColor + opacity follows the
+                // wrapper through the theme transition without snapping.
+                color: "currentColor",
+                opacity: 0.7,
                 margin: "24px 0 0",
                 maxWidth: 640,
                 letterSpacing: "-0.005em",
@@ -673,44 +1086,44 @@ function Hero() {
               data layer built for enterprise restaurants. Every order, every channel,
               every decision, connected.
             </p>
-          </Reveal>
+          </ScrollReveal>
 
-          <Reveal delay={240}>
-            {/* +32px padding above the CTA row per spec (36 → 68) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 68, flexWrap: "wrap" }}>
-              <FlowCTA>Book a demo</FlowCTA>
-              <a
-                href="#"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontFamily: FONT_BODY,
-                  fontSize: 15,
-                  fontWeight: 500,
-                  color: T.ink,
-                  letterSpacing: "-0.005em",
-                  textDecoration: "none",
-                  padding: "13px 16px",
-                }}
-              >
-                See the platform <ArrowRight size={15} strokeWidth={2} />
+          {/* CTA row uses FadeReveal — no clip-path so the FlowCTA's gradient
+              border + drop shadow extend freely. */}
+          <FadeReveal delay={240}>
+            {/* CTA row sits 64px below the description; 32px between CTAs */}
+            <div style={{ display: "flex", alignItems: "center", gap: 32, marginTop: 64, flexWrap: "wrap" }}>
+              <FlowCTA lottieSrc="/lotties/book-a-demo-trailing.json">Book a demo</FlowCTA>
+              {/* "See the platform" — clean ghost link by default. On hover:
+                  scale 1.04, persimmon fill rises bottom→top across the text,
+                  and the trailing arrow slides in. Implemented as the
+                  .ghost-link CSS class in globals.css. */}
+              <a href="#" className="ghost-link">
+                <span className="ghost-link-text" data-text="See the platform">
+                  See the platform
+                </span>
+                <span className="ghost-link-arrow" aria-hidden>
+                  <ArrowRight size={18} strokeWidth={2} />
+                </span>
               </a>
             </div>
-          </Reveal>
+          </FadeReveal>
         </div>
 
         {/* Logo section — sits at the bottom of the flex column. The title
             block's auto margins push it down here; Container's paddingBottom:32
             keeps it 32px above the viewport's bottom edge. */}
         <div style={{ paddingTop: 48 }}>
-          <Reveal>
+          <ScrollReveal>
             <div
               style={{
                 fontFamily: FONT_BODY,
                 fontSize: 15,
                 letterSpacing: "-0.01em",
-                color: T.inkSoft,
+                // currentColor + opacity — passively follows the wrapper
+                // through the theme transition (ink → whisper crossfade).
+                color: "currentColor",
+                opacity: 0.55,
                 fontWeight: 400,
                 marginBottom: 24,
                 textAlign: "center",
@@ -718,10 +1131,13 @@ function Hero() {
             >
               Powering 680 restaurants from emerging brands to enterprise chains
             </div>
-          </Reveal>
-          <Reveal delay={80}>
-            <LogoCarousel bgFade={T.canvas} />
-          </Reveal>
+          </ScrollReveal>
+          <ScrollReveal delay={80}>
+            {/* LogoCarousel now reads the wrapper's [data-theme] internally —
+                no bgFade prop needed. The light + dark edge fades crossfade
+                smoothly in lockstep with the wrapper bg transition. */}
+            <LogoCarousel />
+          </ScrollReveal>
         </div>
       </Container>
     </section>
@@ -915,12 +1331,12 @@ function ConsolidationBenefit() {
   return (
     <section data-section-theme="light" style={{ padding: "120px 0", position: "relative" }}>
       <Container>
-        <Reveal>
+        <ScrollReveal>
           <SectionLabel index="01" label="Consolidation" />
-        </Reveal>
+        </ScrollReveal>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center" }}>
           <div>
-            <Reveal>
+            <ScrollReveal>
               {/* currentColor binds the headline to the wrapper's transitioning
                   text color so the copy stays readable as the bg fades to dark
                   when the AI section enters the viewport. */}
@@ -931,60 +1347,70 @@ function ConsolidationBenefit() {
                 <br />
                 <span style={{ color: T.persimmon600 }}>Run on one</span> platform.
               </Heading>
-            </Reveal>
-            <Reveal delay={120}>
+            </ScrollReveal>
+            <ScrollReveal delay={120}>
               <Body size={17} color="currentColor" style={{ marginTop: 28, maxWidth: 460, opacity: 0.7 }}>
                 Most restaurant chains operate across 7 to 10 disconnected systems
                 for POS, loyalty, ordering, labor, inventory, reporting, and
                 accounting. Nova replaces them with one unified AI-native platform
                 built on a single data layer.
               </Body>
-            </Reveal>
-            <ul style={{ listStyle: "none", padding: 0, margin: "28px 0 32px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {proofs.map((p, i) => (
-                <Reveal key={p} delay={200 + i * 80}>
-                  <li style={{ display: "flex", alignItems: "flex-start", gap: 12, fontSize: 15, color: "currentColor", opacity: 0.85, fontWeight: 500 }}>
-                    {/* Theme-adaptive bullet: light-peach container + coral
-                        check in light mode; translucent persimmon container +
-                        brighter persimmon icon in dark mode (CSS rules in
-                        globals.css scoped via [data-theme="dark"]). */}
-                    <span
-                      className="check-bullet"
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 999,
-                        background: T.persimmon50,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        marginTop: 2,
-                        transition:
-                          "background-color 900ms cubic-bezier(0.4,0,0.2,1)",
-                      }}
-                    >
-                      <Check
-                        className="check-bullet-icon"
-                        size={11}
-                        color={T.persimmon600}
-                        strokeWidth={3}
-                      />
-                    </span>
-                    <span style={{ lineHeight: 1.5 }}>{p}</span>
-                  </li>
-                </Reveal>
+            </ScrollReveal>
+            {/* Proofs cascade in with StaggerGroup — each list item bidirectional-
+                reveals 80ms after the previous, starting 200ms after the body. */}
+            <StaggerGroup
+              as="ul"
+              baseDelay={200}
+              perItemDelay={80}
+              style={{ listStyle: "none", padding: 0, margin: "28px 0 32px", display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              {proofs.map((p) => (
+                <ScrollReveal
+                  key={p}
+                  as="li"
+                  lift={16}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, fontSize: 15, color: "currentColor", opacity: 0.85, fontWeight: 500 }}
+                >
+                  {/* Theme-adaptive bullet: light-peach container + coral
+                      check in light mode; translucent persimmon container +
+                      brighter persimmon icon in dark mode (CSS rules in
+                      globals.css scoped via [data-theme="dark"]). */}
+                  <span
+                    className="check-bullet"
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 999,
+                      background: T.persimmon50,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      marginTop: 2,
+                      transition:
+                        "background-color 900ms cubic-bezier(0.4,0,0.2,1)",
+                    }}
+                  >
+                    <Check
+                      className="check-bullet-icon"
+                      size={11}
+                      color={T.persimmon600}
+                      strokeWidth={3}
+                    />
+                  </span>
+                  <span style={{ lineHeight: 1.5 }}>{p}</span>
+                </ScrollReveal>
               ))}
-            </ul>
-            <Reveal delay={520}>
+            </StaggerGroup>
+            <ScrollReveal delay={520}>
               <a href="#" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, color: T.persimmon600, fontWeight: 600, textDecoration: "none", letterSpacing: "-0.005em" }}>
                 See every Nova module <ArrowRight size={14} />
               </a>
-            </Reveal>
+            </ScrollReveal>
           </div>
-          <Reveal delay={160}>
+          <ScrollReveal delay={160}>
             <ConsolidationDiagram />
-          </Reveal>
+          </ScrollReveal>
         </div>
       </Container>
     </section>
@@ -1080,7 +1506,8 @@ function AICatalogue() {
       title: "AI Voice Ordering",
       subtext: "Drive-thru and phone orders captured in real time. Multilingual conversations with direct POS and KDS integration — every ticket, recovered.",
       accent: T.nebula500,
-      visual: <VoiceVizLarge accent={T.nebula500} />,
+      visual: <VoiceVizLarge />,
+      bareVisual: true, // SVG bg is the card; no frame chrome
     },
     {
       key: "upsell",
@@ -1123,26 +1550,25 @@ function AICatalogue() {
       data-section-theme="dark"
       style={{
         padding: "140px 0",
-        // No explicit color — children inherit from the wrapper so they
-        // animate with it across the dark↔light transition. In light mode
-        // titles render in ink (#14110F); in dark, whisper (#FAFAFB).
-        // Section is transparent — the wrapper's dark theme bg (#171721) shows through.
+        // overflow:visible so the CTA's outer 1px ring + drop shadow render
+        // without clipping. Blob containment is moved to the inner GlowClip
+        // wrapper below so the persimmon/nebula glows still stay inside the
+        // section bounds.
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
 
-      {/* Prominent glows that hold up in both themes — large, saturated bloom
-          so the section reads as the AI moment regardless of wrapper bg. */}
-      <SoftGlow color={T.nebula500} position="top-right" opacity={0.55} />
-      <SoftGlow color={T.persimmon500} position="bottom-left" opacity={0.40} />
+      {/* AI Catalogue runs clean for the lottie pass — gradient blobs removed.
+          We'll re-introduce a tighter ambient layer once the per-card lotties
+          are all in. */}
 
       <Container style={{ position: "relative", zIndex: 1 }}>
-        <Reveal>
+        <ScrollReveal>
           <SectionLabel label="AI Catalogue" color={T.nebula500} />
-        </Reveal>
+        </ScrollReveal>
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 60, alignItems: "end", marginBottom: 80 }}>
-          <Reveal>
+          <ScrollReveal>
             {/* currentColor binds to wrapper's transitioning text color so the
                 copy stays readable during the dark→light wrapper fade. */}
             <Heading size={64} color="currentColor">
@@ -1150,26 +1576,33 @@ function AICatalogue() {
               <br />
               restaurant <span style={{ color: T.nebula500 }}>operations</span>.
             </Heading>
-          </Reveal>
-          <Reveal delay={120}>
+          </ScrollReveal>
+          <ScrollReveal delay={120}>
             <Body color="currentColor" size={17} style={{ paddingBottom: 8, opacity: 0.7 }}>
               Nine AI capabilities across ordering, marketing, operations, labor, and guest engagement. Each one built on the same data layer the rest of Nova runs on.
             </Body>
-          </Reveal>
+          </ScrollReveal>
         </div>
-        {/* Mercury pattern: 6 lottie cards in a 3x2 grid · row gap widened per design */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", columnGap: 28, rowGap: 92 }}>
-          {cards.map(({ key, ...rest }, i) => (
-            <Reveal key={key} delay={i * 120}>
+        {/* Mercury pattern: 6 lottie cards in a 3x2 grid · row gap widened per design.
+            StaggerGroup cascades each card in 80ms after the previous as the grid
+            scrolls into view, bidirectional via the underlying ScrollReveal. */}
+        <StaggerGroup
+          perItemDelay={80}
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", columnGap: 28, rowGap: 92 }}
+        >
+          {cards.map(({ key, ...rest }) => (
+            <ScrollReveal key={key}>
               <MercuryAICard {...rest} />
-            </Reveal>
+            </ScrollReveal>
           ))}
-        </div>
-        <Reveal delay={520}>
+        </StaggerGroup>
+        {/* CTA uses FadeReveal — no clip-path, so the gradient bg + 1px ring
+            + drop shadow extend freely. */}
+        <FadeReveal delay={200}>
           <div style={{ display: "flex", justifyContent: "center", marginTop: 72 }}>
             <FlowCTA onDark>Browse full AI catalogue</FlowCTA>
           </div>
-        </Reveal>
+        </FadeReveal>
       </Container>
     </section>
   );
@@ -1239,51 +1672,65 @@ function SpiralFlow() {
   );
 }
 
-function MercuryAICard({ title, subtext, accent, visual }) {
+function MercuryAICard({ title, subtext, accent, visual, bareVisual }) {
+  // bareVisual = true → strip the rgba frame, border, backdrop blur, glow
+  // blob, and placeholder chip. The provided `visual` IS the card. Used by
+  // the AI Voice Ordering card where the SVG bg has rounded corners + a
+  // gradient that blends into the section bg directly.
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-      {/* Visual card frame — lottie placeholder lives inside */}
       <div
         style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 20,
+          background: bareVisual ? "transparent" : "rgba(255,255,255,0.04)",
+          border: bareVisual ? "none" : "1px solid rgba(255,255,255,0.08)",
+          borderRadius: bareVisual ? 0 : 20,
           position: "relative",
           overflow: "hidden",
           aspectRatio: "1/1.05",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backdropFilter: "blur(10px)",
-          transition: "border-color 320ms ease, transform 320ms cubic-bezier(0.2,0,0,1), background 320ms ease",
+          backdropFilter: bareVisual ? "none" : "blur(10px)",
+          transition: bareVisual
+            ? "transform 320ms cubic-bezier(0.2,0,0,1)"
+            : "border-color 320ms ease, transform 320ms cubic-bezier(0.2,0,0,1), background 320ms ease",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.borderColor = `${accent}55`;
-          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+          if (!bareVisual) {
+            e.currentTarget.style.borderColor = `${accent}55`;
+            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+          }
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+          if (!bareVisual) {
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+          }
         }}
       >
-        {/* Soft accent glow behind the visual — blends into card surface */}
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "80%",
-            height: "70%",
-            background: `radial-gradient(circle at center, ${accent}38 0%, transparent 65%)`,
-            filter: "blur(50px)",
-            pointerEvents: "none",
-          }}
-        />
-        <PlaceholderTag>Lottie placeholder</PlaceholderTag>
+        {/* Soft accent glow + lottie placeholder chip only render for
+            non-bareVisual cards (still waiting on their real lotties). */}
+        {!bareVisual && (
+          <>
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "80%",
+                height: "70%",
+                background: `radial-gradient(circle at center, ${accent}38 0%, transparent 65%)`,
+                filter: "blur(50px)",
+                pointerEvents: "none",
+              }}
+            />
+            <PlaceholderTag>Lottie placeholder</PlaceholderTag>
+          </>
+        )}
         <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {visual}
         </div>
@@ -1321,38 +1768,51 @@ function MercuryAICard({ title, subtext, accent, visual }) {
 }
 
 // Large visualization placeholders — fill the Mercury card area
-function VoiceVizLarge({ accent }) {
+// AI Voice Ordering card · SVG bg + perfectly-centered Lottie.
+// Layer order (bottom→top):
+//   1. ai-voice-card-bg.svg fills the card, object-fit:cover keeps it edge-to-edge
+//   2. Voice AI_01 lottie sits centered in absolute middle with ~52% width
+// The parent MercuryAICard frame is a square (aspect-ratio 1/1.05) and uses
+// position:relative, so absolute children pin to its bounds.
+function VoiceVizLarge() {
   return (
-    <svg viewBox="0 0 320 320" style={{ width: "75%", height: "75%" }}>
-      <defs>
-        <radialGradient id="voice-orb" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.9" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0.3" />
-        </radialGradient>
-        <linearGradient id="voice-bar" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="1" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0.4" />
-        </linearGradient>
-      </defs>
-      {/* concentric rings */}
-      <circle cx="160" cy="160" r="120" fill="none" stroke={accent} strokeOpacity="0.12" strokeWidth="1" />
-      <circle cx="160" cy="160" r="90"  fill="none" stroke={accent} strokeOpacity="0.18" strokeWidth="1" />
-      <circle cx="160" cy="160" r="60"  fill="none" stroke={accent} strokeOpacity="0.25" strokeWidth="1.5" />
-      {/* central orb */}
-      <circle cx="160" cy="160" r="34" fill="url(#voice-orb)" />
-      <circle cx="160" cy="160" r="34" fill="none" stroke={accent} strokeOpacity="0.6" strokeWidth="1" />
-      {/* mic glyph */}
-      <rect x="153" y="148" width="14" height="20" rx="7" fill="#fff" opacity="0.95" />
-      <path d="M 145 165 Q 160 178, 175 165" stroke="#fff" strokeWidth="2" fill="none" opacity="0.85" strokeLinecap="round" />
-      <line x1="160" y1="175" x2="160" y2="183" stroke="#fff" strokeWidth="2" opacity="0.85" strokeLinecap="round" />
-      {/* waveform bars flanking the orb */}
-      {[
-        { x: 60,  h: 8 },  { x: 75,  h: 14 }, { x: 90,  h: 22 }, { x: 105, h: 32 },
-        { x: 215, h: 32 }, { x: 230, h: 22 }, { x: 245, h: 14 }, { x: 260, h: 8  },
-      ].map((b, i) => (
-        <rect key={i} x={b.x - 2} y={160 - b.h / 2} width="4" height={b.h} rx="2" fill="url(#voice-bar)" />
-      ))}
-    </svg>
+    <>
+      {/* BG poster — fills the card */}
+      <img
+        src="/lotties/ai-voice-card-bg.svg"
+        alt=""
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          pointerEvents: "none",
+        }}
+      />
+      {/* Lottie · centered both axes · scaled up to fill more of the
+          ripple zone in the bg artwork. */}
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          width: "72%",
+          aspectRatio: "1/1",
+          transform: "translate(-50%, -50%)",
+          pointerEvents: "none",
+        }}
+      >
+        <LottiePlayer
+          src="/lotties/voice-ai-01.json"
+          loop
+          autoplay
+          ariaLabel="AI Voice Ordering animation"
+          style={{ width: "100%", height: "100%" }}
+        />
+      </div>
+    </>
   );
 }
 
@@ -1613,29 +2073,48 @@ function SystemsThatNeverSpoke() {
   const p = phases[phase];
   return (
     <section ref={ref} data-section-theme="light" style={{ position: "relative", height: "380vh" }}>
-      <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex", alignItems: "center", overflow: "hidden" }}>
+      {/* overflow:visible so the "See the platform" CTA's outer 1px ring + drop
+          shadow render fully on phase 3. Decorative SoftGlow is small enough
+          (and positioned with negative offsets) that body { overflow-x: clip }
+          handles horizontal bleed. */}
+      <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex", alignItems: "center", overflow: "visible" }}>
         <SoftGlow color={phase === 3 ? T.matcha500 : T.persimmon400} position="top-right" opacity={phase === 3 ? 0.12 : 0.2} />
         <Container>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr", gap: 80, alignItems: "center", position: "relative", zIndex: 1 }}>
             <div>
-              <SectionLabel label="The disconnect problem" />
               {/*
-                Inherit color from the page wrapper so the headline stays
-                readable during the dark→light transition. When the wrapper is
-                still dark (#000026, just exited AI section), `currentColor`
-                resolves to #FAFAFB (whisper); as the wrapper bg fades to
-                canvas the same `currentColor` interpolates down to ink. No
-                invisible-flash window.
+                Staggered bidirectional mask reveal: label → title → body.
+                Each piece is wrapped in BiMaskReveal (clip-path mask,
+                bottom-up reveal / top-down hide). The whole block sits
+                inside a PhaseTransition keyed on `phase` — when the user
+                scrolls and the phase advances, the outgoing copy fades to
+                opacity 0 while a fresh incoming copy plays its masked
+                reveals in parallel. No more harsh blank gap.
+
+                The "See the platform" CTA uses FadeReveal (opacity + lift
+                only, no clip-path) so its outer 1px ring + drop shadow
+                aren't clipped by the mask boundary.
               */}
-              <Heading size={64} color="currentColor" style={{ marginBottom: 24 }}>
-                {phase === 3 ? (<>Until <span style={{ color: T.persimmon600 }}>now</span>.</>) : p.head}
-              </Heading>
-              <Body size={18} color="currentColor" style={{ maxWidth: 480, opacity: 0.7 }}>{p.body}</Body>
-              {phase === 3 && (
-                <div style={{ marginTop: 32 }}>
-                  <FlowCTA>See the platform</FlowCTA>
-                </div>
-              )}
+              <PhaseTransition phaseKey={phase} duration={700}>
+                <BiMaskReveal delay={0}>
+                  <SectionLabel label="The disconnect problem" />
+                </BiMaskReveal>
+                <BiMaskReveal delay={140}>
+                  <Heading size={64} color="currentColor" style={{ marginBottom: 24 }}>
+                    {phase === 3 ? (<>Until <span style={{ color: T.persimmon600 }}>now</span>.</>) : p.head}
+                  </Heading>
+                </BiMaskReveal>
+                <BiMaskReveal delay={280}>
+                  <Body size={18} color="currentColor" style={{ maxWidth: 480, opacity: 0.7 }}>{p.body}</Body>
+                </BiMaskReveal>
+                {phase === 3 && (
+                  <FadeReveal delay={420}>
+                    <div style={{ marginTop: 32 }}>
+                      <FlowCTA>See the platform</FlowCTA>
+                    </div>
+                  </FadeReveal>
+                )}
+              </PhaseTransition>
             </div>
             <SystemsGraphic phase={phase} />
           </div>
@@ -1767,29 +2246,33 @@ function Segmenter() {
       <Container>
         {/* Eyebrow + centered headline + centered body — matches the spec. */}
         <div style={{ textAlign: "center", marginBottom: 64 }}>
-          <Reveal>
+          <ScrollReveal>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
               <SectionLabel label="Built for your format" />
             </div>
-          </Reveal>
-          <Reveal delay={80}>
+          </ScrollReveal>
+          <ScrollReveal delay={80}>
             <Heading size={52} color="currentColor" style={{ marginBottom: 20, maxWidth: 980, marginLeft: "auto", marginRight: "auto" }}>
               Whatever your restaurant looks like, Nova runs on it.
             </Heading>
-          </Reveal>
-          <Reveal delay={160}>
+          </ScrollReveal>
+          <ScrollReveal delay={160}>
             <Body color="currentColor" style={{ maxWidth: 760, margin: "0 auto", opacity: 0.7 }}>
               From a single-location new opening to a 680-location enterprise — Nova adapts to where you are and where you&apos;re growing. Find your format and see how operators like you run on Nova.
             </Body>
-          </Reveal>
+          </ScrollReveal>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
-          {formats.map((f, i) => (
-            <Reveal key={f.id} delay={i * 90}>
+        {/* Format cards cascade in 90ms apart via StaggerGroup. */}
+        <StaggerGroup
+          perItemDelay={90}
+          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}
+        >
+          {formats.map((f) => (
+            <ScrollReveal key={f.id}>
               <FormatCard {...f} />
-            </Reveal>
+            </ScrollReveal>
           ))}
-        </div>
+        </StaggerGroup>
       </Container>
     </section>
   );
@@ -2038,44 +2521,49 @@ function HowItWorks() {
         <SoftGlow color={step.accent} position="top-right" opacity={0.10} />
         <SoftGlow color={T.cobalt500} position="bottom-left" opacity={0.06} />
         <Container style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
-          {/* TOP: title + body only — centered. No section label, stepper, or kicker. */}
+          {/* TOP: title + body only — centered. No section label, stepper, or kicker.
+              Wrapped in PhaseTransition so step changes crossfade rather than
+              hard-snap: outgoing copy fades to opacity 0 while the incoming
+              copy mounts and plays its BiMaskReveal bottom-up motion. */}
           <div style={{ paddingTop: 96, paddingBottom: 24, textAlign: "center", flexShrink: 0 }}>
-            <div
-              key={`title-${stepIndex}`}
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 48,
-                lineHeight: 1.08,
-                letterSpacing: "-0.035em",
-                fontWeight: 500,
-                color: "currentColor",
-                // 48px top margin separates the title from the floating header
-                marginTop: 48,
-                marginBottom: 14,
-                maxWidth: 880,
-                marginLeft: "auto",
-                marginRight: "auto",
-                animation: "step-fade 600ms cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
-            >
-              {step.title}
-            </div>
-            <div
-              key={`body-${stepIndex}`}
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: 16,
-                lineHeight: 1.55,
-                color: "currentColor",
-                opacity: 0.7,
-                maxWidth: 620,
-                margin: "0 auto",
-                marginBottom: 48,
-                animation: "step-fade 700ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both",
-              }}
-            >
-              {step.body}
-            </div>
+            <PhaseTransition phaseKey={stepIndex} duration={700}>
+              <BiMaskReveal delay={0}>
+                <div
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 48,
+                    lineHeight: 1.08,
+                    letterSpacing: "-0.035em",
+                    fontWeight: 500,
+                    color: "currentColor",
+                    // 48px top margin separates the title from the floating header
+                    marginTop: 48,
+                    marginBottom: 14,
+                    maxWidth: 880,
+                    marginLeft: "auto",
+                    marginRight: "auto",
+                  }}
+                >
+                  {step.title}
+                </div>
+              </BiMaskReveal>
+              <BiMaskReveal delay={160}>
+                <div
+                  style={{
+                    fontFamily: FONT_BODY,
+                    fontSize: 16,
+                    lineHeight: 1.55,
+                    color: "currentColor",
+                    opacity: 0.7,
+                    maxWidth: 620,
+                    margin: "0 auto",
+                    marginBottom: 48,
+                  }}
+                >
+                  {step.body}
+                </div>
+              </BiMaskReveal>
+            </PhaseTransition>
           </div>
 
           {/* BOTTOM: visual fills remaining vertical space */}
@@ -2300,41 +2788,48 @@ function CustomerOutcomes() {
       <SoftGlow color={T.persimmon400} position="top-right" opacity={0.10} />
       <Container>
         <div style={{ textAlign: "center", marginBottom: 64 }}>
-          <Reveal>
+          <ScrollReveal>
             <div style={{ display: "flex", justifyContent: "center" }}>
               <SectionLabel label="Customer outcomes" color={T.matcha600} />
             </div>
-          </Reveal>
-          <Reveal delay={80}>
+          </ScrollReveal>
+          <ScrollReveal delay={80}>
             <Heading size={56} color="currentColor" style={{ marginBottom: 20 }}>
               What operators see in the
               <br />
               <span style={{ color: T.persimmon600 }}>first 90 days</span>.
             </Heading>
-          </Reveal>
-          <Reveal delay={160}>
+          </ScrollReveal>
+          <ScrollReveal delay={160}>
             <Body color="currentColor" style={{ maxWidth: 680, margin: "0 auto", opacity: 0.7 }}>
               From enterprise chains consolidating eleven contracts to emerging brands launching their first AI-native location.
             </Body>
-          </Reveal>
+          </ScrollReveal>
         </div>
 
-        {/* Three expandable panels — flex; expanded grows, others stay at fixed compact width */}
-        <Reveal>
-          <div style={{ display: "flex", gap: 16, height: 560, alignItems: "stretch" }}>
-            {cards.map((c, i) => {
-              const isExpanded = expanded === i;
-              return (
+        {/* Three expandable panels — each cascades in via StaggerGroup so the
+            grid reads as a coordinated entrance. flex/expanded behaviour is
+            preserved through the individual ScrollReveal wrappers. */}
+        <StaggerGroup
+          perItemDelay={100}
+          style={{ display: "flex", gap: 16, height: 560, alignItems: "stretch" }}
+        >
+          {cards.map((c, i) => {
+            const isExpanded = expanded === i;
+            return (
+              <ScrollReveal
+                key={c.headline}
+                style={{ display: "flex", flex: isExpanded ? "1 1 0" : "0 0 auto", minWidth: 0 }}
+              >
                 <OutcomePanel
-                  key={c.headline}
                   card={c}
                   expanded={isExpanded}
                   onActivate={() => setExpanded(i)}
                 />
-              );
-            })}
-          </div>
-        </Reveal>
+              </ScrollReveal>
+            );
+          })}
+        </StaggerGroup>
       </Container>
     </section>
   );
@@ -2557,40 +3052,39 @@ function OutcomePanel({ card, expanded, onActivate }) {
 // =========================================================
 function FinalCTA() {
   return (
-    <section data-section-theme="dark" style={{ color: T.whisper, padding: "120px 0", position: "relative", overflow: "hidden" }}>
-      <SoftGlow color={T.persimmon500} position="top-right" opacity={0.30} />
-      <SoftGlow color={T.nebula600} position="bottom-left" opacity={0.20} />
+    <section data-section-theme="dark" style={{ color: T.whisper, padding: "120px 0", position: "relative", overflow: "visible" }}>
+      {/* Blob containment layer — clips the decorative glows without touching
+          the CTA outer ring/shadow. */}
+      <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+        <SoftGlow color={T.persimmon500} position="top-right" opacity={0.30} />
+        <SoftGlow color={T.nebula600} position="bottom-left" opacity={0.20} />
+      </div>
       <Container narrow>
         <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-          <Reveal>
+          <ScrollReveal>
             <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: T.persimmon500, fontWeight: 500, marginBottom: 32 }}>
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: T.persimmon500, marginRight: 12, verticalAlign: "middle" }} />
               Book a demo
             </div>
-          </Reveal>
-          <Reveal delay={80}>
+          </ScrollReveal>
+          <ScrollReveal delay={80}>
             <Display size={88} color={T.whisper}>
               The new front of <span style={{ color: T.persimmon500 }}>house</span>.
             </Display>
-          </Reveal>
-          <Reveal delay={160}>
+          </ScrollReveal>
+          <ScrollReveal delay={160}>
             <Body color={T.whisperSoft} size={19} style={{ maxWidth: 560, margin: "32px auto 0" }}>
               See how modern restaurant operations run on Nova. We&apos;ll show you the product, then your stack.
             </Body>
-          </Reveal>
-          <Reveal delay={240}>
+          </ScrollReveal>
+          {/* CTA row uses FadeReveal so the FlowCTA's gradient bg + ring + drop
+              shadow render without any clip-path interference. */}
+          <FadeReveal delay={240}>
             <div style={{ marginTop: 44, display: "flex", gap: 12, justifyContent: "center" }}>
-              <FlowCTA onDark>Book a demo</FlowCTA>
+              <FlowCTA onDark lottieSrc="/lotties/book-a-demo-trailing.json">Book a demo</FlowCTA>
               <Button variant="invertGhost">Talk to sales</Button>
             </div>
-          </Reveal>
-          <div style={{ marginTop: 72, paddingTop: 32, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "center", gap: 28, flexWrap: "wrap" }}>
-            {["PCI DSS", "EMV", "SOC 2", "Responsible AI"].map((t) => (
-              <span key={t} style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: T.whisperSoft }}>
-                {t}
-              </span>
-            ))}
-          </div>
+          </FadeReveal>
         </div>
       </Container>
     </section>
