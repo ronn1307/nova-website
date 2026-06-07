@@ -351,6 +351,72 @@ body {
   border-color: #2A2A35 !important;
 }
 
+/* =========================================================
+   Benefits section — theme-adaptive visual card + stat callout
+   The Benefits section is scroll-pinned and sits right before the
+   dark AI Catalogue section, so its visuals need to transition
+   light → dark smoothly when the wrapper theme flips. Border and
+   bg both transition over 900ms to match the wrapper.
+   ========================================================= */
+.benefit-visual {
+  border: 1px dashed #E7E7EB;
+  transition: border-color 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="dark"] .benefit-visual {
+  border-color: #2A2A35;
+}
+
+.benefit-stat-callout {
+  background: #FFFFFF;
+  border: 1px solid #E7E7EB;
+  box-shadow: 0 12px 28px -16px rgba(20,17,15,0.20);
+  transition: background-color 900ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color    900ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow      900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="dark"] .benefit-stat-callout {
+  background: #20202B;
+  border-color: #2A2A35;
+  box-shadow: 0 12px 28px -16px rgba(0,0,0,0.50);
+}
+
+/* =========================================================
+   Format card thumbnail — hover zoom
+   The scaling wrapper sits inside an overflow:hidden / rounded
+   container so the zoom stays clipped to the card's rounded
+   boundary. Eases over ~700ms cubic-out for a smooth lift.
+   ========================================================= */
+.format-card-thumb-inner {
+  transform: scale(1);
+  transition: transform 700ms cubic-bezier(0.2, 0, 0, 1);
+}
+.format-card:hover .format-card-thumb-inner {
+  transform: scale(1.06);
+}
+.format-card-cta {
+  transition: gap 220ms ease;
+}
+.format-card:hover .format-card-cta {
+  gap: 10px;
+}
+
+/* =========================================================
+   AI Catalogue tagline chip — theme-adaptive text color
+   The chip text uses a LIGHTER accent shade in dark mode (good
+   contrast against the dark wrapper) and a DARKER accent shade in
+   light mode (good contrast against the light wrapper). Variables
+   are set inline per card (--chip-dark, --chip-light); the swap
+   happens here via the wrapper's [data-theme] attribute, with the
+   same 900ms easing as the rest of the theme transition.
+   ========================================================= */
+.ai-tagline-chip {
+  color: var(--chip-dark, currentColor);
+  transition: color 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="light"] .ai-tagline-chip {
+  color: var(--chip-light, currentColor);
+}
+
 /* Sticky scroll · step content fade-in when step index changes */
 @keyframes step-fade {
   from { opacity: 0; transform: translateY(14px); }

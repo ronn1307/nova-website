@@ -175,12 +175,14 @@ function Button({ children, variant = "primary", onClick, style, arrow = false }
   );
 }
 
-function SectionLabel({ label, color = T.persimmon600 }) {
+function SectionLabel({ label, color = T.persimmon600, marginBottom = 28 }) {
   // Stripped of the leading dot — the label stands on its own. Weight bumped
   // one step (500 → 600) so the label reads with more authority alongside
-  // the now-uniform Inter type system.
+  // the now-uniform Inter type system. `marginBottom` is overridable so
+  // individual sections can tighten the label→headline gap without forking
+  // the component.
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", marginBottom: 28 }}>
+    <div style={{ display: "inline-flex", alignItems: "center", marginBottom }}>
       <span
         style={{
           fontFamily: FONT_MONO,
@@ -859,9 +861,11 @@ export default function LandingPage() {
     >
       <Nav theme={theme} />
       <Hero />
-      <ConsolidationBenefit />
+      {/* KpiShelf commented out per direction — keep around in case we
+          want to bring it back. Dot grid restored to Hero. */}
+      {/* <KpiShelf /> */}
+      <Benefits />
       <AICatalogue />
-      <SystemsThatNeverSpoke />
       <Segmenter />
       <HowItWorks />
       <CustomerOutcomes />
@@ -1021,15 +1025,10 @@ function Hero() {
         overflow: "visible",
       }}
     >
-      {/* WebGL cursor-vacuum dot grid. Canvas is transparent — the wrapper's
-          bg shows through and transitions naturally. */}
+      {/* WebGL cursor-vacuum dot grid restored to Hero — provides the
+          interactive ambient backdrop. Theme vignettes crossfade in
+          lockstep with the wrapper's light↔dark transition. */}
       <NovaDotfield />
-      {/* Two layered vignettes — one for each theme — crossfade via opacity
-          driven by [data-theme] on the wrapper. Gradient colors can't
-          transition, but opacity can, so this gives a smooth 900ms blend
-          that stays in lockstep with the wrapper's bg transition.
-          The bottom band stays taller in both so the logo strip sits on
-          solid canvas regardless of which theme is active. */}
       <div className="hero-vignette hero-vignette-light" aria-hidden />
       <div className="hero-vignette hero-vignette-dark" aria-hidden />
       <Container
@@ -1043,104 +1042,552 @@ function Hero() {
           paddingBottom: 32,
         }}
       >
-        {/* Headline / description / CTA — vertically centered between the
-            header bottom and the logo strip via auto margins above + below. */}
-        <div style={{ marginTop: "auto", marginBottom: "auto" }}>
-          <ScrollReveal>
-            <h1
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 48,
-                lineHeight: 1.08,
-                letterSpacing: "-0.028em",
-                fontWeight: 500,
-                // currentColor inherits the wrapper's transitioning text color.
-                // When wrapper is light: ink. When the wrapper is still dark
-                // mid-scroll: whisper. Avoids a hard-coded light value clashing
-                // with the wrapper during the 900ms theme transition.
-                color: "currentColor",
-                margin: "0",
-                maxWidth: 880,
-              }}
-            >
-              The unified <span style={{ color: T.persimmon600 }}>AI-native</span> platform for restaurant operations.
-            </h1>
-          </ScrollReveal>
+        {/* 2-column grid: text content left, collage Lottie right. flex:1
+            so this block fills the available height; the KPI bar that
+            follows sits naturally at the bottom of the viewport. */}
+        <div
+          style={{
+            flex: 1,
+            display: "grid",
+            gridTemplateColumns: "1.1fr 1fr",
+            gap: 64,
+            alignItems: "center",
+          }}
+        >
+          {/* LEFT · text content */}
+          <div>
+            <ScrollReveal>
+              {/* Eyebrow — small monospace label that anchors the page */}
+              <div
+                style={{
+                  fontFamily: FONT_MONO,
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: T.persimmon600,
+                  fontWeight: 600,
+                  marginBottom: 24,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: T.persimmon600 }} />
+                The AI Restaurant OS · 2026
+              </div>
+            </ScrollReveal>
 
-          <ScrollReveal delay={160}>
-            <p
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: 16,
-                lineHeight: 1.56, // matches Figma body/16 (156%)
-                // Same reasoning as h1 — currentColor + opacity follows the
-                // wrapper through the theme transition without snapping.
-                color: "currentColor",
-                opacity: 0.7,
-                margin: "24px 0 0",
-                maxWidth: 640,
-                letterSpacing: "-0.005em",
-              }}
-            >
-              POS, ordering, kitchen, loyalty, workforce and AI — on one intelligent
-              data layer built for enterprise restaurants. Every order, every channel,
-              every decision, connected.
-            </p>
-          </ScrollReveal>
+            <ScrollReveal delay={80}>
+              <h1
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontSize: 48,
+                  lineHeight: 1.08,
+                  letterSpacing: "-0.028em",
+                  fontWeight: 500,
+                  // currentColor inherits the wrapper's transitioning text color.
+                  // When wrapper is light: ink. When the wrapper is still dark
+                  // mid-scroll: whisper. Avoids a hard-coded light value clashing
+                  // with the wrapper during the 900ms theme transition.
+                  color: "currentColor",
+                  margin: "0",
+                }}
+              >
+                The unified <span style={{ color: T.persimmon600 }}>AI-native</span> platform for restaurant operations.
+              </h1>
+            </ScrollReveal>
 
-          {/* CTA row uses FadeReveal — no clip-path so the FlowCTA's gradient
-              border + drop shadow extend freely. */}
-          <FadeReveal delay={240}>
-            {/* CTA row sits 64px below the description; 32px between CTAs */}
-            <div style={{ display: "flex", alignItems: "center", gap: 32, marginTop: 64, flexWrap: "wrap" }}>
-              <FlowCTA lottieSrc="/lotties/book-a-demo-trailing.json">Book a demo</FlowCTA>
-              {/* "See the platform" — clean ghost link by default. On hover:
-                  scale 1.04, persimmon fill rises bottom→top across the text,
-                  and the trailing arrow slides in. Implemented as the
-                  .ghost-link CSS class in globals.css. */}
-              <a href="#" className="ghost-link">
-                <span className="ghost-link-text" data-text="See the platform">
-                  See the platform
-                </span>
-                <span className="ghost-link-arrow" aria-hidden>
-                  <ArrowRight size={18} strokeWidth={2} />
-                </span>
-              </a>
-            </div>
+            <ScrollReveal delay={160}>
+              <p
+                style={{
+                  fontFamily: FONT_BODY,
+                  fontSize: 16,
+                  lineHeight: 1.56, // matches Figma body/16 (156%)
+                  // Same reasoning as h1 — currentColor + opacity follows the
+                  // wrapper through the theme transition without snapping.
+                  color: "currentColor",
+                  opacity: 0.7,
+                  margin: "24px 0 0",
+                  maxWidth: 560,
+                  letterSpacing: "-0.005em",
+                }}
+              >
+                From digital ordering and in-store POS to kitchen workflows, loyalty,
+                workforce management, and AI automation — one single intelligent platform.
+              </p>
+            </ScrollReveal>
+
+            {/* CTA row uses FadeReveal — no clip-path so the FlowCTA's gradient
+                border + drop shadow extend freely. */}
+            <FadeReveal delay={240}>
+              {/* CTA row sits 48px below the description; 32px between CTAs */}
+              <div style={{ display: "flex", alignItems: "center", gap: 32, marginTop: 48, flexWrap: "wrap" }}>
+                <FlowCTA lottieSrc="/lotties/book-a-demo-trailing.json">Book a demo</FlowCTA>
+                {/* "See the platform" — clean ghost link by default. On hover:
+                    scale 1.04, persimmon fill rises bottom→top across the text,
+                    and the trailing arrow slides in. Implemented as the
+                    .ghost-link CSS class in globals.css. */}
+                <a href="#" className="ghost-link">
+                  <span className="ghost-link-text" data-text="See the platform">
+                    See the platform
+                  </span>
+                  <span className="ghost-link-arrow" aria-hidden>
+                    <ArrowRight size={18} strokeWidth={2} />
+                  </span>
+                </a>
+              </div>
+            </FadeReveal>
+
+          </div>
+
+          {/* RIGHT · Lottie collage placeholder slot.
+              Team is delivering a single Lottie. For now we render a clean
+              4-cell ghost grid sized to the eventual aspect, with a subtle
+              "Lottie · Hero collage" placeholder label so it's obvious this
+              is intentional. Swap the placeholder for <LottiePlayer src="..." />
+              when the file lands. */}
+          <FadeReveal delay={200}>
+            <HeroCollagePlaceholder />
           </FadeReveal>
         </div>
 
-        {/* Logo section — sits at the bottom of the flex column. The title
-            block's auto margins push it down here; Container's paddingBottom:32
-            keeps it 32px above the viewport's bottom edge. */}
-        <div style={{ paddingTop: 48 }}>
-          <ScrollReveal>
-            <div
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: 15,
-                letterSpacing: "-0.01em",
-                // currentColor + opacity — passively follows the wrapper
-                // through the theme transition (ink → whisper crossfade).
-                color: "currentColor",
-                opacity: 0.55,
-                fontWeight: 400,
-                marginBottom: 24,
-                textAlign: "center",
-              }}
-            >
-              Powering 680 restaurants from emerging brands to enterprise chains
-            </div>
-          </ScrollReveal>
-          <ScrollReveal delay={80}>
-            {/* LogoCarousel now reads the wrapper's [data-theme] internally —
-                no bgFade prop needed. The light + dark edge fades crossfade
-                smoothly in lockstep with the wrapper bg transition. */}
-            <LogoCarousel />
-          </ScrollReveal>
+        {/* Logo carousel pinned to the bottom of the Hero viewport. Caption
+            + carousel render directly (no ScrollReveal wrapper) — wrapping
+            them in ScrollReveal hides them on load because the bidirectional
+            IO with negative bottom rootMargin treats bottom-pinned elements
+            as "below the effective viewport" until the user scrolls. */}
+        <div style={{ paddingTop: 24 }}>
+          <div
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 15,
+              letterSpacing: "-0.01em",
+              color: "currentColor",
+              opacity: 0.55,
+              fontWeight: 400,
+              marginBottom: 24,
+              textAlign: "center",
+            }}
+          >
+            Powering 680 restaurants from emerging brands to enterprise chains
+          </div>
+          <LogoCarousel />
         </div>
       </Container>
     </section>
+  );
+}
+
+// =========================================================
+//  KPI SHELF — full-viewport-height section directly below the Hero.
+//  Five proof metrics in a 3+2 flex layout (3 items in row 1, 2 items in
+//  row 2 — row 2 sits naturally narrower and centered by the section's
+//  alignItems: center). Spec mirrors Figma node 1005:1691 verbatim.
+//
+//  Background: the interactive WebGL dot field (NovaDotfield) — moved
+//  here from the Hero. Reads as a quiet ambient pulse behind the KPIs
+//  with cursor-vacuum interaction.
+//
+//  Reveal: BIDIRECTIONAL — a single section-level IntersectionObserver
+//  toggles `inView` on every entry/exit. Items cascade in L→R when
+//  entering, fade out together when leaving. Counter only animates the
+//  FIRST time the section enters view (KpiShelfItem tracks `hasSettled`
+//  internally and renders a static span thereafter), so revisits feel
+//  fluid without re-counting.
+// =========================================================
+function KpiShelf() {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) {
+      setInView(true);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Bidirectional — toggle inView on every transition.
+        setInView(entry.isIntersecting);
+      },
+      { threshold: 0.3 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [reduced]);
+
+  const kpis = [
+    { value: 10,  prefix: "",  suffix: "+",  decimals: 0, label: "vendors replaced" },
+    { value: 18,  prefix: "+", suffix: "%",  decimals: 0, label: "sales from AI insights" },
+    { value: 7.4, prefix: "+", suffix: "%",  decimals: 1, label: "avg ticket from AI upsell" },
+    { value: 42,  prefix: "$", suffix: "",   decimals: 0, label: "recovered per missed call" },
+    { value: 14,  prefix: "",  suffix: "%",  decimals: 0, label: "loyalty win-back rate" },
+  ];
+  const row1 = kpis.slice(0, 3);
+  const row2 = kpis.slice(3, 5);
+
+  // 200ms stagger between items — slower than before so the cascade is
+  // perceivable even with a generous IO threshold trigger.
+  const STAGGER = 200;
+
+  return (
+    <section
+      ref={ref}
+      data-section-theme="light"
+      style={{
+        position: "relative",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        // padding-top = design 128 + 96 navbar offset → so justifyContent:
+        // center actually centers in the BELOW-NAVBAR visible area rather
+        // than the section's geometric center. Without this the sticky
+        // 96px nav overlaps the top and the KPIs end up ~48px above the
+        // visible center of the viewport.
+        paddingTop: 224,
+        paddingBottom: 128,
+        paddingInline: 96,
+        overflow: "hidden",
+      }}
+    >
+      {/* Interactive WebGL dot field — same component the Hero used to
+          host. Sits behind the KPIs as ambient bg; cursor still triggers
+          the vacuum/burst effects. Higher baseAlpha here than the Hero's
+          default so the dots read clearly behind the centered KPIs. */}
+      <NovaDotfield baseAlpha={1.0} />
+
+      {/* Soft canvas-tone vignette so the dot grid concentrates around
+          the centered KPIs and quietly fades into the section bg at the
+          edges — keeps the labels reading crisply against the dots. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: "none",
+          background:
+            "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(250,250,251,0) 0%, rgba(250,250,251,0.4) 75%, rgba(250,250,251,0.92) 100%)",
+        }}
+      />
+
+      {/* KPI rows — relative + zIndex so they sit above the dot field.
+          Row-to-row gap is 96px; item-to-item gap inside each row stays at
+          72px per Figma. */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 96,
+        }}
+      >
+        <div style={{ display: "flex", gap: 96, alignItems: "flex-start" }}>
+          {row1.map((kpi, i) => (
+            <KpiShelfItem
+              key={kpi.label}
+              kpi={kpi}
+              delay={i * STAGGER}
+              active={inView}
+            />
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 96, alignItems: "flex-start" }}>
+          {row2.map((kpi, i) => (
+            <KpiShelfItem
+              key={kpi.label}
+              kpi={kpi}
+              delay={(i + 3) * STAGGER}
+              active={inView}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// =========================================================
+//  KPI SHELF ITEM — single cell. Matches Figma 1005:1691:
+//    · Number: Inter Medium 72px / 108% / -2.016px tracking / ink
+//    · Label:  Inter Regular 14px / 21px / inkMuted
+//    · Gap between number and label: 9px
+//
+//  Behavior: bidirectional fade + lift gated on parent's `active` flag.
+//  When active flips true, setTimeout fires at the item's staggered delay
+//  → `shown` flips true → item fades in + counter mounts and animates
+//  from 0. Counter is one-shot per session: once it finishes, hasSettled
+//  flips and subsequent reveals render a static span instead of CountUp
+//  so revisits don't re-tick the number.
+// =========================================================
+function KpiShelfItem({ kpi, delay, active }) {
+  const [shown, setShown] = useState(false);
+  const [hasSettled, setHasSettled] = useState(false);
+  const reduced = usePrefersReducedMotion();
+
+  // Gate the fade in/out on `active` + delay. Bidirectional — when
+  // active flips back to false (section scrolled out), hide immediately.
+  useEffect(() => {
+    if (!active) {
+      setShown(false);
+      return;
+    }
+    if (reduced) {
+      setShown(true);
+      setHasSettled(true);
+      return;
+    }
+    const t = setTimeout(() => setShown(true), delay);
+    return () => clearTimeout(t);
+  }, [active, delay, reduced]);
+
+  // Once shown lands true for the first time, schedule the "settled"
+  // flip after the counter animation finishes (1700ms duration + buffer).
+  // After this, future reveals render a static span — no re-tick.
+  useEffect(() => {
+    if (!shown || hasSettled || reduced) return;
+    const t = setTimeout(() => setHasSettled(true), 1700 + 100);
+    return () => clearTimeout(t);
+  }, [shown, hasSettled, reduced]);
+
+  // Static placeholder showing the final value — keeps the column width
+  // stable both before reveal (hidden) and after settle (visible).
+  const finalText = `${kpi.prefix}${kpi.decimals > 0 ? kpi.value.toFixed(kpi.decimals) : Math.round(kpi.value)}${kpi.suffix}`;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 9,
+        opacity: shown ? 1 : 0,
+        transform: shown ? "translateY(0)" : "translateY(16px)",
+        transition: reduced
+          ? "none"
+          : "opacity 700ms ease, transform 800ms cubic-bezier(0.22, 1, 0.36, 1)",
+        willChange: "opacity, transform",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-inter), Inter, sans-serif",
+          fontSize: 88,
+          fontWeight: 500,
+          lineHeight: 1.08,
+          // Keep the Figma -2.8% kerning ratio at the new size: 88 × -0.028
+          letterSpacing: "-2.464px",
+          color: T.ink,
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {shown && !hasSettled ? (
+          <CountUp
+            value={kpi.value}
+            prefix={kpi.prefix}
+            suffix={kpi.suffix}
+            decimals={kpi.decimals}
+            duration={1700}
+            startDelay={0}
+            triggerOn="mount"
+          />
+        ) : (
+          <span style={{ visibility: shown ? "visible" : "hidden" }}>
+            {finalText}
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--font-inter), Inter, sans-serif",
+          fontSize: 14,
+          fontWeight: 400,
+          lineHeight: "21px",
+          color: T.inkMuted,
+          textAlign: "center",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {kpi.label}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+//  COUNT-UP — animated number that eases from 0 to `value`. Honors
+//  prefers-reduced-motion (lands immediately). Cubic ease-out so the
+//  number decelerates as it approaches the target.
+//
+//    triggerOn = "mount"     → starts on component mount + startDelay
+//    triggerOn = "viewport"  → waits for IntersectionObserver entry (default)
+//
+//  Use "mount" for elements that are visible from page load (Hero KPIs);
+//  use "viewport" for elements that animate when the user scrolls them
+//  into view.
+// =========================================================
+function CountUp({
+  value,
+  prefix = "",
+  suffix = "",
+  decimals = 0,
+  duration = 1400,
+  startDelay = 0,
+  triggerOn = "viewport",
+}) {
+  const ref = useRef(null);
+  const [display, setDisplay] = useState(0);
+  const startedRef = useRef(false);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) {
+      setDisplay(value);
+      return;
+    }
+    if (startedRef.current) return;
+
+    const start = () => {
+      if (startedRef.current) return;
+      startedRef.current = true;
+      const begin = performance.now() + startDelay;
+      let raf;
+      const frame = (now) => {
+        if (now < begin) {
+          raf = requestAnimationFrame(frame);
+          return;
+        }
+        const t = Math.min((now - begin) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3); // cubic ease-out
+        setDisplay(value * eased);
+        if (t < 1) raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+    };
+
+    if (triggerOn === "mount") {
+      start();
+      return;
+    }
+
+    // viewport trigger — used by reveals that animate on scroll-in
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          start();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [value, duration, startDelay, reduced, triggerOn]);
+
+  const formatted = decimals > 0
+    ? display.toFixed(decimals)
+    : Math.round(display).toString();
+
+  return (
+    <span ref={ref} style={{ fontVariantNumeric: "tabular-nums" }}>
+      {prefix}{formatted}{suffix}
+    </span>
+  );
+}
+
+// =========================================================
+//  HERO LOGO SECTION — logo carousel pulled out of the Hero into its
+//  own dedicated band. Appears as the user scrolls down past the hero.
+//  Light theme, hairlines top/bottom for separation.
+// =========================================================
+function HeroLogoSection() {
+  return (
+    <section
+      data-section-theme="light"
+      style={{
+        padding: "72px 0",
+        position: "relative",
+      }}
+    >
+      <Container>
+        <ScrollReveal>
+          <div
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 15,
+              letterSpacing: "-0.01em",
+              color: "currentColor",
+              opacity: 0.55,
+              fontWeight: 400,
+              marginBottom: 28,
+              textAlign: "center",
+            }}
+          >
+            Powering 680 restaurants from emerging brands to enterprise chains
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={80}>
+          <LogoCarousel />
+        </ScrollReveal>
+      </Container>
+    </section>
+  );
+}
+
+// =========================================================
+//  HERO COLLAGE PLACEHOLDER
+//  Temporary placeholder for the team's hero Lottie. Sized to roughly
+//  the eventual collage aspect (1:1) with a soft 4-tile ghost grid that
+//  reads as "intentional placeholder, not broken." Replace the inside
+//  with <LottiePlayer src="/lotties/hero-collage.json" /> when the team
+//  delivers the file.
+// =========================================================
+function HeroCollagePlaceholder() {
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: "1 / 1",
+        maxWidth: 480,
+        marginLeft: "auto",
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1fr",
+        gridTemplateRows: "1.2fr 1fr",
+        gap: 10,
+        padding: 0,
+      }}
+    >
+      <PlaceholderTag>Lottie · hero collage</PlaceholderTag>
+      {[
+        { area: "1 / 1 / 2 / 2", grad: "linear-gradient(150deg, #F9A06044 0%, #E9504D22 100%)" },
+        { area: "1 / 2 / 2 / 3", grad: "linear-gradient(150deg, #FAAF8933 0%, #F1785722 100%)" },
+        { area: "2 / 1 / 3 / 2", grad: "linear-gradient(150deg, #9965F033 0%, #6A43D822 100%)" },
+        { area: "2 / 2 / 3 / 3", grad: "linear-gradient(150deg, #FFD5A833 0%, #F9A06022 100%)" },
+      ].map((cell, i) => (
+        <div
+          key={i}
+          style={{
+            gridArea: cell.area,
+            background: cell.grad,
+            border: `1px dashed ${T.hairline}`,
+            borderRadius: 18,
+            backdropFilter: "blur(2px)",
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -1319,7 +1766,353 @@ function LogoStrip() {
 }
 
 // =========================================================
-//  CONSOLIDATION BENEFIT
+//  STATS BAR — five high-level proof stats, full-width row between
+//  Hero and Benefits. Modeled on the 2026 source's StatsBar.
+// =========================================================
+function StatsBar() {
+  const stats = [
+    { v: "7–10+",  l: "legacy vendors replaced" },
+    { v: "+18%",   l: "sales from AI insights" },
+    { v: "+7.4%",  l: "avg ticket from AI upsell" },
+    { v: "$42",    l: "recovered per missed call" },
+    { v: "14%",    l: "loyalty win-back rate" },
+  ];
+  return (
+    <section
+      data-section-theme="light"
+      style={{
+        padding: "56px 0",
+        borderTop: `1px solid ${T.hairline}`,
+        borderBottom: `1px solid ${T.hairline}`,
+        position: "relative",
+      }}
+    >
+      <Container>
+        <StaggerGroup
+          perItemDelay={70}
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))`,
+            gap: 20,
+            alignItems: "start",
+          }}
+        >
+          {stats.map((s) => (
+            <ScrollReveal key={s.v + s.l} lift={16}>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 40,
+                    lineHeight: 1.0,
+                    letterSpacing: "-0.035em",
+                    fontWeight: 500,
+                    color: "currentColor",
+                    marginBottom: 8,
+                  }}
+                >
+                  {s.v}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_BODY,
+                    fontSize: 13,
+                    lineHeight: 1.45,
+                    letterSpacing: "-0.005em",
+                    color: "currentColor",
+                    opacity: 0.62,
+                  }}
+                >
+                  {s.l}
+                </div>
+              </div>
+            </ScrollReveal>
+          ))}
+        </StaggerGroup>
+      </Container>
+    </section>
+  );
+}
+
+// =========================================================
+//  BENEFITS — scroll-pinned 3-phase narrative. Left text + right visual
+//  stay anchored in the viewport while the user scrolls through; as
+//  scroll progresses the phase advances (PhaseTransition crossfades
+//  outgoing/incoming layers) and each piece of text rises in with
+//  BiMaskReveal's bottom-up curtain.
+//
+//  Dark-mode compatible: section has NO own bg (lets the wrapper bg show
+//  through), all text uses currentColor, the visual card uses a subtle
+//  accent tint that reads on both light and dark, and the stat callout
+//  uses a theme-following `.benefit-stat-callout` CSS class so it crossfades
+//  in lockstep with the wrapper as the user enters AI Catalogue (dark).
+// =========================================================
+function Benefits() {
+  const ref = useRef(null);
+  const progress = useSectionProgress(ref);
+  const phases = [
+    {
+      key: "01",
+      title: (
+        <>
+          Stop managing multiple vendors.
+          <br />
+          <span style={{ color: T.persimmon600 }}>Run on one</span> platform.
+        </>
+      ),
+      body:
+        "Nova replaces 10–18 disconnected restaurant systems with one AI-native operating system — covering POS, digital ordering, kitchen, loyalty, workforce management, and real-time analytics.",
+      proof: [
+        "Modern POS built for speed and scale",
+        "Online ordering, mobile app, kiosk, and drive-thru unified",
+        "Loyalty and guest data connected across every channel",
+        "Kitchen Display System integrated with every ordering source",
+      ],
+      statV: "7–10+",
+      statL: "legacy vendors replaced in typical enterprise deployments",
+      linkLabel: "See every Nova module",
+      linkHref: "#platform",
+      placeholderTag: "Lottie · platform consolidation",
+      tone: "warm",
+    },
+    {
+      key: "02",
+      title: (
+        <>
+          AI that grows revenue.
+          <br />
+          AI that <span style={{ color: T.nebula500 }}>improves operations</span>.
+        </>
+      ),
+      body:
+        "Nova brings AI directly into restaurant operations across ordering, labor, guest engagement, and real-time decision making.",
+      proof: [
+        "AI Voice captures phone and drive-thru orders 24/7",
+        "AI Insights surface sales, menu, and operational opportunities in real time",
+        "AI Labor Optimization improves staffing efficiency",
+        "AI Operations detects voids, comps, and issues instantly",
+      ],
+      statV: "+18%",
+      statL: "in sales from a single Reporting AI insight",
+      linkLabel: "Explore AI at the core",
+      linkHref: "#ai-core",
+      placeholderTag: "Lottie · AI at the core",
+      tone: "cool",
+    },
+    {
+      key: "03",
+      title: (
+        <>
+          Know every guest.
+          <br />
+          <span style={{ color: T.persimmon600 }}>Personalize</span> every visit.
+        </>
+      ),
+      body:
+        "Nova connects guest activity across every ordering channel into one intelligent customer profile, helping restaurants increase loyalty, repeat visits, and average ticket size.",
+      proof: [
+        "AI-driven upsell based on guest behavior",
+        "Smarter campaigns powered by real-time customer data",
+        "Connected loyalty across digital and in-store channels",
+        "Consistent guest experiences across every touchpoint",
+      ],
+      statV: "+7.4%",
+      statL: "average ticket lift from AI-powered upsell across every channel",
+      linkLabel: "See AI-driven upsell",
+      linkHref: "#loyalty",
+      placeholderTag: "Lottie · guest personalization",
+      tone: "mint",
+    },
+  ];
+  const phaseIndex = Math.min(phases.length - 1, Math.floor(progress * phases.length));
+  const p = phases[phaseIndex];
+
+  return (
+    <section
+      ref={ref}
+      data-section-theme="light"
+      style={{
+        position: "relative",
+        height: "320vh",
+      }}
+    >
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <Container style={{ width: "100%" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 80,
+              alignItems: "stretch",
+              minHeight: 520,
+            }}
+          >
+            {/* LEFT — text content. PhaseTransition crossfades old → new
+                phase content, BiMaskReveal inside lifts each piece up. */}
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <PhaseTransition phaseKey={phaseIndex} duration={700}>
+                <BiMaskReveal delay={0}>
+                  <Heading size={52} color="currentColor">
+                    {p.title}
+                  </Heading>
+                </BiMaskReveal>
+                <BiMaskReveal delay={140}>
+                  <Body size={17} color="currentColor" style={{ marginTop: 24, maxWidth: 480, opacity: 0.72 }}>
+                    {p.body}
+                  </Body>
+                </BiMaskReveal>
+                <BiMaskReveal delay={280}>
+                  <ul style={{ listStyle: "none", padding: 0, margin: "32px 0 36px", display: "flex", flexDirection: "column", gap: 14 }}>
+                    {p.proof.map((point) => (
+                      <li
+                        key={point}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          fontSize: 15,
+                          color: "currentColor",
+                          opacity: 0.86,
+                          fontWeight: 500,
+                        }}
+                      >
+                        <span
+                          className="check-bullet"
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 999,
+                            background: T.persimmon50,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 2,
+                            transition: "background-color 900ms cubic-bezier(0.4,0,0.2,1)",
+                          }}
+                        >
+                          <Check className="check-bullet-icon" size={11} color={T.persimmon600} strokeWidth={3} />
+                        </span>
+                        <span style={{ lineHeight: 1.5 }}>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </BiMaskReveal>
+                <FadeReveal delay={420}>
+                  <a
+                    href={p.linkHref}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 14,
+                      color: T.persimmon600,
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      letterSpacing: "-0.005em",
+                    }}
+                  >
+                    {p.linkLabel} <ArrowRight size={14} />
+                  </a>
+                </FadeReveal>
+              </PhaseTransition>
+            </div>
+
+            {/* RIGHT — visual placeholder. Same PhaseTransition pattern
+                so the visual + stat callout crossfade alongside the
+                content. Equal height to the left column for visual balance. */}
+            <PhaseTransition phaseKey={phaseIndex} duration={700}>
+              <BenefitVisualPlaceholder
+                key={p.key}
+                tag={p.placeholderTag}
+                tone={p.tone}
+                statV={p.statV}
+                statL={p.statL}
+              />
+            </PhaseTransition>
+          </div>
+        </Container>
+      </div>
+    </section>
+  );
+}
+
+function BenefitVisualPlaceholder({ tag, tone, statV, statL }) {
+  // Tone tints — accent-color gradients with no hard-coded bg end stop,
+  // so they fade naturally into whatever wrapper bg sits behind them
+  // (light during Benefits, dark mid-transition into AI Catalogue).
+  const tones = {
+    warm: "linear-gradient(150deg, rgba(241,120,87,0.22) 0%, rgba(241,120,87,0) 100%)",
+    cool: "linear-gradient(150deg, rgba(106,67,216,0.22) 0%, rgba(106,67,216,0) 100%)",
+    mint: "linear-gradient(150deg, rgba(91,180,138,0.22) 0%, rgba(91,180,138,0) 100%)",
+  };
+  return (
+    <div
+      className="benefit-visual"
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        minHeight: 520,
+        borderRadius: 24,
+        background: tones[tone] || tones.warm,
+        overflow: "hidden",
+      }}
+    >
+      <PlaceholderTag>{tag}</PlaceholderTag>
+      {/* Stat callout — theme-following bg/border via .benefit-stat-callout
+          class. Crossfades light → dark in lockstep with the wrapper. */}
+      <div
+        className="benefit-stat-callout"
+        style={{
+          position: "absolute",
+          right: 28,
+          bottom: 28,
+          padding: "16px 20px",
+          borderRadius: 16,
+          maxWidth: 280,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 28,
+            lineHeight: 1.0,
+            letterSpacing: "-0.03em",
+            fontWeight: 500,
+            color: T.persimmon600,
+            marginBottom: 6,
+          }}
+        >
+          {statV}
+        </div>
+        <div
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 12,
+            lineHeight: 1.45,
+            color: "currentColor",
+            opacity: 0.72,
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {statL}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+//  CONSOLIDATION BENEFIT  (LEGACY — kept for Platform inner page)
 // =========================================================
 function ConsolidationBenefit() {
   const proofs = [
@@ -1500,48 +2293,73 @@ function ConsolidationDiagram() {
 //  AI CATALOGUE — Mercury-style: 3 lottie cards with title + subtext below
 // =========================================================
 function AICatalogue() {
+  // Cards adopt the 2026 content titles. Each carries a `tagline` — short,
+  // stat-anchored phrase rendered below the title in a refined accent-bar +
+  // mono-caps treatment, replacing the legacy pill pattern.
   const cards = [
+    // chipText (DARK MODE) = lighter accent for contrast on dark bg.
+    // chipTextLight (LIGHT MODE) = darker accent for contrast on light bg.
+    // CSS-driven swap via [data-theme] on the wrapper transitions smoothly
+    // alongside the rest of the dark↔light handoff.
     {
       key: "voice",
-      title: "AI Voice Ordering",
-      subtext: "Drive-thru and phone orders captured in real time. Multilingual conversations with direct POS and KDS integration — every ticket, recovered.",
+      title: "Interactive Voice Ordering",
+      tagline: "$42 recovered per missed call",
+      subtext: "AI Voice automates drive-thru and phone ordering with real-time conversations and direct POS and KDS integration.",
       accent: T.nebula500,
+      chipText: "#BBA5EE",        // lighter nebula → dark mode
+      chipTextLight: "#6A43D8",   // darker nebula → light mode
       visual: <VoiceVizLarge />,
-      bareVisual: true, // SVG bg is the card; no frame chrome
+      bareVisual: true,
     },
     {
       key: "upsell",
-      title: "Automated Upsell",
-      subtext: "Personalized AI recommendations across every channel — digital, kiosk, drive-thru, in-store — that lift average ticket size on every order.",
+      title: "Automated Upsell & Cross-Sell",
+      tagline: "+7.4% average ticket lift",
+      subtext: "Personalized AI recommendations increase average ticket across digital, kiosk, drive-thru, and in-store ordering.",
       accent: T.persimmon500,
+      chipText: "#F8AA94",
+      chipTextLight: "#D43F39",
       visual: <UpsellVizLarge accent={T.persimmon500} />,
     },
     {
       key: "insights",
-      title: "Reporting AI",
-      subtext: "Surfaces actionable opportunities across location, daypart, menu item, and guest behavior — automatically, in plain English.",
+      title: "Sales Insights & Recommendations",
+      tagline: "+18% sales lift at Bayou Bistro",
+      subtext: "AI analyzes sales patterns and surfaces actionable opportunities by location, daypart, menu item, and guest behavior.",
       accent: T.cobalt500,
+      chipText: "#8FB8F2",
+      chipTextLight: "#2A60C0",
       visual: <InsightsVizLarge accent={T.cobalt500} />,
     },
     {
       key: "vision",
-      title: "Vision AI",
-      subtext: "Tracks line speed, table turn, and operational anomalies in real time — without adding a single new device to the line.",
+      title: "Menu Engineering",
+      tagline: "Smarter menu decisions",
+      subtext: "AI optimizes pricing, promotions, and menu performance based on real guest demand across every channel.",
       accent: T.matcha500,
+      chipText: "#9BD5B4",
+      chipTextLight: "#3A8C66",
       visual: <VisionVizLarge accent={T.matcha500} />,
     },
     {
       key: "copilot",
-      title: "Manager Copilot",
-      subtext: "A conversational interface to your entire restaurant operation. Ask plain-English questions; get real answers backed by live data.",
+      title: "Staff Scheduling Optimization",
+      tagline: "Optimized labor costs",
+      subtext: "AI-driven scheduling aligns staffing with real-time demand across every location and daypart.",
       accent: T.saffron500,
+      chipText: "#F0D17C",
+      chipTextLight: "#A06A12",
       visual: <CopilotVizLarge accent={T.saffron500} />,
     },
     {
       key: "campaigns",
-      title: "AI Campaigns",
-      subtext: "Generates audiences, offers, and messaging automatically — across SMS, email, and loyalty — based on what your guests actually do.",
+      title: "AI Campaign Management",
+      tagline: "Higher engagement and retention",
+      subtext: "Generates campaigns, audiences, offers, and messaging automatically across email, SMS, and loyalty channels.",
       accent: T.persimmon500,
+      chipText: "#F8AA94",
+      chipTextLight: "#D43F39",
       visual: <CampaignsVizLarge accent={T.persimmon500} />,
     },
   ];
@@ -1579,7 +2397,7 @@ function AICatalogue() {
           </ScrollReveal>
           <ScrollReveal delay={120}>
             <Body color="currentColor" size={17} style={{ paddingBottom: 8, opacity: 0.7 }}>
-              Nine AI capabilities across ordering, marketing, operations, labor, and guest engagement. Each one built on the same data layer the rest of Nova runs on.
+              Nova delivers AI across ordering, marketing, operations, labor, and guest engagement through one connected platform and data layer.
             </Body>
           </ScrollReveal>
         </div>
@@ -1596,11 +2414,20 @@ function AICatalogue() {
             </ScrollReveal>
           ))}
         </StaggerGroup>
-        {/* CTA uses FadeReveal — no clip-path, so the gradient bg + 1px ring
-            + drop shadow extend freely. */}
+        {/* Dual CTA row — Browse catalogue (primary) + See AI architecture
+            (ghost link). FadeReveal so the FlowCTA's gradient bg + 1px ring
+            + drop shadow render without clipping. */}
         <FadeReveal delay={200}>
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 72 }}>
-            <FlowCTA onDark>Browse full AI catalogue</FlowCTA>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 32, marginTop: 72, flexWrap: "wrap" }}>
+            <FlowCTA onDark>Browse the full AI catalogue</FlowCTA>
+            <a href="#" className="ghost-link" style={{ color: "currentColor" }}>
+              <span className="ghost-link-text" data-text="See AI architecture">
+                See AI architecture
+              </span>
+              <span className="ghost-link-arrow" aria-hidden>
+                <ArrowRight size={18} strokeWidth={2} />
+              </span>
+            </a>
           </div>
         </FadeReveal>
       </Container>
@@ -1672,7 +2499,7 @@ function SpiralFlow() {
   );
 }
 
-function MercuryAICard({ title, subtext, accent, visual, bareVisual }) {
+function MercuryAICard({ title, subtext, tagline, accent, chipText, chipTextLight, visual, bareVisual }) {
   // bareVisual = true → strip the rgba frame, border, backdrop blur, glow
   // blob, and placeholder chip. The provided `visual` IS the card. Used by
   // the AI Voice Ordering card where the SVG bg has rounded corners + a
@@ -1736,9 +2563,39 @@ function MercuryAICard({ title, subtext, accent, visual, bareVisual }) {
         </div>
       </div>
 
-      {/* Title + subtext BELOW the card, not inside. Both bound to currentColor
-          so they fade with the wrapper across the dark↔light transition. */}
+      {/* Tagline chip + title + subtext below the visual.
+          The tagline chip sits ABOVE the title and uses a vertical
+          gradient (accent at 10% alpha top → 0% bottom) plus a lighter
+          accent text color — reads as a quiet proof badge that
+          stays visually balanced against the dark AI section bg. */}
       <div>
+        {tagline && (
+          <div style={{ marginBottom: 14 }}>
+            <span
+              className="ai-tagline-chip"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "5px 12px",
+                borderRadius: 999,
+                background: `linear-gradient(180deg, ${accent}1A 0%, ${accent}00 100%)`,
+                border: `1px solid ${accent}29`,
+                fontFamily: FONT_BODY,
+                fontSize: 12.5,
+                lineHeight: 1.3,
+                fontWeight: 500,
+                letterSpacing: "-0.005em",
+                whiteSpace: "nowrap",
+                // CSS custom properties consumed by .ai-tagline-chip — light
+                // mode picks --chip-light, dark mode picks --chip-dark.
+                "--chip-dark": chipText || accent,
+                "--chip-light": chipTextLight || accent,
+              }}
+            >
+              {tagline}
+            </span>
+          </div>
+        )}
         <div
           style={{
             fontSize: 22,
@@ -2207,48 +3064,71 @@ function Segmenter() {
   // Four format cards. Each card: photographic-feel image at top (rounded with
   // the card), bold title beneath, body subtext, and a persimmon CTA. Card
   // order matches the spec: QSR → Full service → Cafés → Enterprise.
+  // Format cards: rich PNG background (textured brand thumbnail from Figma)
+  // layered with an SVG icon on top. PNG handles the atmospheric look; SVG
+  // icon stays vector-sharp and renders at a fixed width so the natural
+  // aspect ratio of each illustration is preserved — no squishing.
   const formats = [
-    {
-      id: "qsr",
-      title: "Quick service & drive-thru",
-      body: "Voice AI takes drive-thru orders. Vision AI watches the lane. POS and KDS sub-second synchronized.",
-      cta: "Quick service on Nova",
-      bg: "linear-gradient(140deg, #2A1410 0%, #6B2A1E 45%, #C24A28 100%)",
-      visual: "speed",
-    },
-    {
-      id: "full-service",
-      title: "Full service & fine dining",
-      body: "Handhelds at every station. Floor management that learns your covers. Guest history in one tap.",
-      cta: "Full service on Nova",
-      bg: "linear-gradient(155deg, #1F1410 0%, #4A2620 45%, #8C4938 100%)",
-      visual: "floor",
-    },
-    {
-      id: "cafe",
-      title: "Cafes, bars & bakeries",
-      body: "Open in days. Update menus on the fly. The same AI-native platform the enterprise customers run.",
-      cta: "Cafes & bars on Nova",
-      bg: "linear-gradient(150deg, #14202A 0%, #2C4150 50%, #4E6E80 100%)",
-      visual: "warmth",
-    },
     {
       id: "enterprise",
       title: "Multi-brand & enterprise",
-      body: "Multi-brand, multi-location from day one. Single source of truth across every store. Land & expand GTM.",
+      body: "Unified operations, reporting, and guest data across every brand, location, and ordering channel.",
       cta: "Enterprise on Nova",
-      bg: "linear-gradient(135deg, #2B1C0F 0%, #6B4521 50%, #C4862F 100%)",
-      visual: "grid",
+      bg: "/formats/enterprise.png",
+      icon: "/formats/icon-enterprise.svg",
+      iconWidth: 130, // tuned per illustration so each reads at a similar visual weight
+    },
+    {
+      id: "full-service",
+      title: "Full-service & Fine dining",
+      body: "Handheld ordering, intelligent floor management, and connected guest experiences.",
+      cta: "Full-service on Nova",
+      bg: "/formats/full-service.png",
+      icon: "/formats/icon-full-service.svg",
+      iconWidth: 130,
+    },
+    {
+      id: "qsr",
+      title: "Quick service & Drive thru",
+      body: "AI Voice, Vision AI, and real-time POS and kitchen synchronization for high-speed operations.",
+      cta: "Quick-service on Nova",
+      bg: "/formats/quick-service.png",
+      icon: "/formats/icon-quick-service.svg",
+      iconWidth: 110,
+    },
+    {
+      id: "cafe",
+      title: "Cafes, Bars & Bakeries",
+      body: "Launch quickly, update menus instantly, and operate on one unified AI-native platform.",
+      cta: "Cafes & bars on Nova",
+      bg: "/formats/cafes.png",
+      icon: "/formats/icon-cafes.svg",
+      iconWidth: 110,
     },
   ];
   return (
     <section data-section-theme="light" style={{ padding: "120px 0", position: "relative" }}>
       <Container>
-        {/* Eyebrow + centered headline + centered body — matches the spec. */}
+        {/* Eyebrow + centered headline + centered body — matches the spec.
+            Inline the label (instead of <SectionLabel/>) so we can pin the
+            gap to title at exactly 16px — SectionLabel ships its own 28px
+            margin-bottom which made the stack feel airy. */}
         <div style={{ textAlign: "center", marginBottom: 64 }}>
           <ScrollReveal>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-              <SectionLabel label="Built for your format" />
+            <div style={{ marginBottom: 16 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: FONT_MONO,
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: T.persimmon600,
+                  fontWeight: 600,
+                }}
+              >
+                Built for your format
+              </span>
             </div>
           </ScrollReveal>
           <ScrollReveal delay={80}>
@@ -2258,17 +3138,19 @@ function Segmenter() {
           </ScrollReveal>
           <ScrollReveal delay={160}>
             <Body color="currentColor" style={{ maxWidth: 760, margin: "0 auto", opacity: 0.7 }}>
-              From a single-location new opening to a 680-location enterprise — Nova adapts to where you are and where you&apos;re growing. Find your format and see how operators like you run on Nova.
+              Built for QSR, fast casual, café, full service, franchise, and enterprise at every stage of growth.
             </Body>
           </ScrollReveal>
         </div>
-        {/* Format cards cascade in 90ms apart via StaggerGroup. */}
+        {/* Format cards cascade in 90ms apart via StaggerGroup.
+            alignItems:stretch + height:100% on the wrappers makes every card
+            match the tallest one in the row regardless of body length. */}
         <StaggerGroup
           perItemDelay={90}
-          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}
+          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, alignItems: "stretch" }}
         >
           {formats.map((f) => (
-            <ScrollReveal key={f.id}>
+            <ScrollReveal key={f.id} style={{ height: "100%" }}>
               <FormatCard {...f} />
             </ScrollReveal>
           ))}
@@ -2396,81 +3278,141 @@ function FormatVisual({ kind }) {
   );
 }
 
-function FormatCard({ title, body, cta, bg, visual }) {
-  // Unified card frame: image bleeds to the top edges, bold title +
-  // descriptive body + persimmon linked CTA stacked below inside the same
-  // rounded white surface. No overlay text on the image, no per-format
-  // accent color — every CTA is persimmon per the design.
+function FormatCard({ title, body, cta, bg, icon, iconWidth = 120 }) {
+  // Figma 2026 design: rich PNG thumbnail background (atmospheric brand
+  // gradient + texture) layered with an SVG icon centered on top. SVG is
+  // rendered at a FIXED width + auto height so its natural aspect ratio is
+  // preserved — no squishing of the steering wheel, bell+hand, etc.
+  //
+  // Hover: bg + icon scale together (1.06) inside the rounded overflow
+  // boundary for a smooth zoom feel.
+  // CTA is pinned to the column bottom via marginTop:auto so all 4 cards'
+  // "X on Nova" links sit on the same baseline.
   return (
     <article
+      className="format-card"
       style={{
         position: "relative",
-        background: T.surface,
-        border: `1px solid ${T.hairline}`,
-        borderRadius: 22,
         display: "flex",
         flexDirection: "column",
-        overflow: "hidden",
-        transition: "transform 320ms cubic-bezier(0.2,0,0,1), box-shadow 320ms ease, border-color 320ms ease",
+        gap: 0,
+        height: "100%",
+        background: "transparent",
+        border: "none",
         cursor: "pointer",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-6px)";
-        e.currentTarget.style.boxShadow = "0 28px 56px -28px rgba(20,17,15,0.22)";
-        e.currentTarget.style.borderColor = T.divider;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.borderColor = T.hairline;
+        transition: "transform 320ms cubic-bezier(0.2,0,0,1)",
       }}
     >
-      {/* IMAGE — top of card, bleeds to edges, atmospheric branded artwork. */}
+      {/* Branded thumbnail — PNG bg + SVG icon layered. Both live inside
+          the scaling wrapper so hover zoom stays clipped by the rounded
+          boundary; they zoom together. */}
       <div
+        className="format-card-thumb"
         style={{
           position: "relative",
-          aspectRatio: "4/3.6",
-          background: bg,
+          width: "100%",
+          aspectRatio: "216 / 295",
+          borderRadius: 22,
           overflow: "hidden",
+          // Match the section canvas (light) so any PNG corner transparency
+          // blends into the page rather than punching a dark hole through.
+          background: "transparent",
         }}
       >
-        <div style={{ position: "absolute", inset: 0 }}>
-          <FormatVisual kind={visual} />
-        </div>
-      </div>
-      {/* TEXT BLOCK — bold title, body, persimmon CTA. */}
-      <div style={{ padding: "26px 24px 28px", display: "flex", flexDirection: "column", gap: 14, flex: 1 }}>
         <div
+          className="format-card-thumb-inner"
           style={{
-            fontFamily: FONT_DISPLAY,
-            fontSize: 18,
-            fontWeight: 600,
-            letterSpacing: "-0.02em",
-            color: T.ink,
-            lineHeight: 1.25,
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            willChange: "transform",
           }}
         >
-          {title}
+          {/* PNG bg — full cover. */}
+          <img
+            src={bg}
+            alt=""
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+          {/* SVG icon — fixed width, auto height to preserve aspect ratio. */}
+          <img
+            src={icon}
+            alt=""
+            style={{
+              position: "relative",
+              width: iconWidth,
+              height: "auto",
+              display: "block",
+              filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.25))",
+            }}
+          />
         </div>
-        <div style={{ fontSize: 14.5, color: T.inkMuted, lineHeight: 1.55, flex: 1 }}>
-          {body}
+      </div>
+
+      {/* Text block — title, 2-line body, persimmon link. */}
+      <div
+        style={{
+          padding: "12px 6px 0",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div
+            style={{
+              fontFamily: FONT_DISPLAY,
+              fontSize: 18,
+              fontWeight: 600,
+              letterSpacing: "-0.005em",
+              color: T.ink,
+              lineHeight: 1.56,
+            }}
+          >
+            {title}
+          </div>
+          <div
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 12,
+              fontWeight: 400,
+              letterSpacing: "-0.005em",
+              color: T.inkMuted,
+              lineHeight: 1.4,
+            }}
+          >
+            {body}
+          </div>
         </div>
+        {/* marginTop: auto pins the CTA to the bottom so all 4 cards' links
+            align on the same baseline regardless of body length. */}
         <a
           href="#"
+          className="format-card-cta"
           style={{
+            marginTop: "auto",
+            paddingTop: 16,
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            fontSize: 13.5,
-            fontWeight: 600,
+            fontFamily: FONT_BODY,
+            fontSize: 14,
+            fontWeight: 500,
             letterSpacing: "-0.005em",
             color: T.persimmon600,
             textDecoration: "none",
-            marginTop: 4,
-            transition: "gap 220ms ease",
+            lineHeight: 1.71,
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.gap = "10px")}
-          onMouseLeave={(e) => (e.currentTarget.style.gap = "6px")}
         >
           {cta}
           <ArrowRight size={14} strokeWidth={2.2} />
@@ -2492,19 +3434,19 @@ function HowItWorks() {
     {
       kicker: "Step 01 · Connect",
       title: "Launch in days, not quarters.",
-      body: "Plug Nova into your existing infrastructure — digital ordering, mobile, loyalty, and analytics go live before your next pre-shift. Zero rip-and-replace required to start.",
+      body: "Launch quickly with digital ordering, mobile, loyalty, and analytics using your existing infrastructure.",
       accent: T.persimmon500,
     },
     {
       kicker: "Step 02 · Unify",
       title: "Every channel, one data layer.",
-      body: "POS, kiosk, drive-thru, app, and online ordering converge into a single guest profile, a single inventory, a single source of truth. The end of duct-taped integrations.",
+      body: "Run POS, kiosk, drive-thru, app, and online ordering on one connected data platform.",
       accent: T.cobalt500,
     },
     {
       kicker: "Step 03 · Improve",
       title: "AI runs the room with you.",
-      body: "Reporting AI surfaces opportunities. Voice AI catches every missed call. Manager Copilot answers in plain English. Every shift, the platform learns from the last one.",
+      body: "AI continuously optimizes operations, guest engagement, revenue, and labor using live restaurant data.",
       accent: T.nebula500,
     },
   ];
@@ -2790,11 +3732,13 @@ function CustomerOutcomes() {
         <div style={{ textAlign: "center", marginBottom: 64 }}>
           <ScrollReveal>
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <SectionLabel label="Customer outcomes" color={T.matcha600} />
+              {/* Override SectionLabel's default 28px bottom margin so the
+                  visual gap to the headline below lands at exactly 16px. */}
+              <SectionLabel label="Customer outcomes" color={T.matcha600} marginBottom={16} />
             </div>
           </ScrollReveal>
           <ScrollReveal delay={80}>
-            <Heading size={56} color="currentColor" style={{ marginBottom: 20 }}>
+            <Heading size={56} color="currentColor" style={{ marginBottom: 20, lineHeight: 1.20 }}>
               What operators see in the
               <br />
               <span style={{ color: T.persimmon600 }}>first 90 days</span>.
@@ -2807,19 +3751,35 @@ function CustomerOutcomes() {
           </ScrollReveal>
         </div>
 
-        {/* Three expandable panels — each cascades in via StaggerGroup so the
-            grid reads as a coordinated entrance. flex/expanded behaviour is
-            preserved through the individual ScrollReveal wrappers. */}
-        <StaggerGroup
-          perItemDelay={100}
-          style={{ display: "flex", gap: 16, height: 560, alignItems: "stretch" }}
-        >
+        {/* Three expandable panels. The ScrollReveal wrapper is the actual
+            flex child of the row container, so the size transition has to
+            live on it — animating the inner OutcomePanel's flex while the
+            wrapper jumps was the cause of the "things jumping around" feel.
+            We override ScrollReveal's transition string to include flex,
+            and compute the per-item stagger delay manually since we're not
+            wrapping in StaggerGroup. Inner OutcomePanel stays at 100% width
+            of its wrapper and no longer animates flex itself. */}
+        <div style={{ display: "flex", gap: 16, height: 560, alignItems: "stretch" }}>
           {cards.map((c, i) => {
             const isExpanded = expanded === i;
+            const stagDelay = i * 100;
             return (
               <ScrollReveal
                 key={c.headline}
-                style={{ display: "flex", flex: isExpanded ? "1 1 0" : "0 0 auto", minWidth: 0 }}
+                delay={stagDelay}
+                style={{
+                  display: "flex",
+                  flex: isExpanded ? "1 1 0" : "0 0 240px",
+                  minWidth: 0,
+                  // Override ScrollReveal's internal transition string so the
+                  // wrapper smoothly animates `flex` alongside the reveal
+                  // properties. Smooth ease-out (no spring overshoot) keeps
+                  // sibling panels from shimmying as the expansion settles.
+                  transition:
+                    `opacity ${REVEAL_DURATION}ms ${REVEAL_EASE} ${stagDelay}ms, ` +
+                    `transform ${REVEAL_DURATION}ms ${REVEAL_EASE} ${stagDelay}ms, ` +
+                    `flex 640ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                }}
               >
                 <OutcomePanel
                   card={c}
@@ -2829,7 +3789,7 @@ function CustomerOutcomes() {
               </ScrollReveal>
             );
           })}
-        </StaggerGroup>
+        </div>
       </Container>
     </section>
   );
@@ -2837,9 +3797,10 @@ function CustomerOutcomes() {
 
 function OutcomePanel({ card, expanded, onActivate }) {
   const { brand, kicker, headline, quote, who, role, photoBg, photoAlt, features } = card;
-  // Click-to-expand (replaces previous hover). Enter/Space activate via
-  // keyboard for accessibility. Expansion uses a spring-like cubic-bezier
-  // (slight overshoot then settle) for a tactile "snap into place" feel.
+  // Click-to-expand. Enter/Space activate via keyboard for accessibility.
+  // The actual size change is owned by the ScrollReveal wrapper above so
+  // OutcomePanel just fills 100% of whatever width its wrapper gives it —
+  // animating flex in two places was what made the row "jump".
   const handleKey = (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -2856,9 +3817,10 @@ function OutcomePanel({ card, expanded, onActivate }) {
       aria-expanded={expanded}
       aria-label={`Customer outcome: ${headline}`}
       style={{
-        // Expanded grows to fill remaining space; collapsed stays at 240px
-        flex: expanded ? "1 1 auto" : "0 0 240px",
-        minWidth: 240,
+        // Fill the ScrollReveal wrapper. Wrapper owns the size transition.
+        flex: "1 1 auto",
+        width: "100%",
+        minWidth: 0,
         background: T.surface,
         // Border defaults to T.hairline (light mode); CSS `.outcome-panel`
         // rule swaps it to a lighter midnight gray when wrapper is dark.
@@ -2868,10 +3830,6 @@ function OutcomePanel({ card, expanded, onActivate }) {
         display: "flex",
         cursor: "pointer",
         transition:
-          // Spring-like overshoot for flex (width) + smooth ease-out for the
-          // visual chrome. Matches the wrapper's 900ms theme fade timing for
-          // border so the border color swaps in lockstep with the theme.
-          "flex 720ms cubic-bezier(0.34, 1.56, 0.64, 1), " +
           "border-color 900ms cubic-bezier(0.4, 0, 0.2, 1), " +
           "box-shadow 420ms cubic-bezier(0.16, 1, 0.3, 1)",
         boxShadow: expanded
@@ -3053,12 +4011,8 @@ function OutcomePanel({ card, expanded, onActivate }) {
 function FinalCTA() {
   return (
     <section data-section-theme="dark" style={{ color: T.whisper, padding: "120px 0", position: "relative", overflow: "visible" }}>
-      {/* Blob containment layer — clips the decorative glows without touching
-          the CTA outer ring/shadow. */}
-      <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
-        <SoftGlow color={T.persimmon500} position="top-right" opacity={0.30} />
-        <SoftGlow color={T.nebula600} position="bottom-left" opacity={0.20} />
-      </div>
+      {/* Decorative glows removed — the dark canvas reads cleaner without
+          the persimmon/nebula blooms competing with the CTA. */}
       <Container narrow>
         <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
           <ScrollReveal>
@@ -3068,13 +4022,13 @@ function FinalCTA() {
             </div>
           </ScrollReveal>
           <ScrollReveal delay={80}>
-            <Display size={88} color={T.whisper}>
-              The new front of <span style={{ color: T.persimmon500 }}>house</span>.
+            <Display size={72} color={T.whisper}>
+              See how modern restaurant operations <span style={{ color: T.persimmon500 }}>run on Nova</span>.
             </Display>
           </ScrollReveal>
           <ScrollReveal delay={160}>
-            <Body color={T.whisperSoft} size={19} style={{ maxWidth: 560, margin: "32px auto 0" }}>
-              See how modern restaurant operations run on Nova. We&apos;ll show you the product, then your stack.
+            <Body color={T.whisperSoft} size={19} style={{ maxWidth: 620, margin: "32px auto 0" }}>
+              Bring your operations, technology, or digital team. We&apos;ll show how Nova simplifies restaurant operations through one connected AI-native platform.
             </Body>
           </ScrollReveal>
           {/* CTA row uses FadeReveal so the FlowCTA's gradient bg + ring + drop
@@ -3112,7 +4066,6 @@ function Footer() {
       style={{
         color: T.whisper,
         padding: "64px 0 40px",
-        borderTop: `1px solid ${darkHairline}`,
       }}
     >
       <Container>
