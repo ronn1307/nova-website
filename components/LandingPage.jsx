@@ -117,10 +117,17 @@ function Body({ children, color = T.inkMuted, size = 17, style }) {
   );
 }
 
-function Button({ children, variant = "primary", onClick, style, arrow = false }) {
+function Button({ children, variant = "primary", onClick, style, arrow = false, lottieSrc }) {
   // Base layout/typography — works at every size. Padding + font-size are
   // overridable via the `style` prop on the call-site (Nav scrolled state
   // passes 8/16 + fontSize 14 → sm; default = md scale).
+  //
+  // When `lottieSrc` is passed, the children stay in their normal layout
+  // position but the Lottie is overlaid as an absolute layer covering the
+  // entire button (inset:0). Mirrors the FlowCTA pattern so Nav + Footer
+  // "Book a demo" buttons can host the arrowless Lottie superimposed on
+  // top of their static label. Button gets position:relative +
+  // overflow:hidden so the absolute layer is clipped to the pill.
   const base = {
     fontFamily: FONT_BODY,
     fontSize: 14,
@@ -135,6 +142,8 @@ function Button({ children, variant = "primary", onClick, style, arrow = false }
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    position: "relative",
+    overflow: "hidden",
   };
   // Variant-specific inline styles. Note: `primary` keeps `color: #FFFFFF`
   // here but bg/box-shadow live in `.btn-gradient-primary` CSS so the
@@ -169,8 +178,25 @@ function Button({ children, variant = "primary", onClick, style, arrow = false }
       className={className}
       style={{ ...base, ...variants[variant], ...style }}
     >
-      {children}
-      {arrow && <ArrowRight size={16} strokeWidth={2} />}
+      <span style={{ position: "relative", zIndex: 2, display: "inline-flex", alignItems: "center", gap: 8 }}>
+        {children}
+        {arrow && <ArrowRight size={16} strokeWidth={2} />}
+      </span>
+      {lottieSrc && (
+        <LottiePlayer
+          src={lottieSrc}
+          loop
+          autoplay
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 3,
+          }}
+        />
+      )}
     </button>
   );
 }
@@ -1122,7 +1148,7 @@ function Hero() {
             <FadeReveal delay={240}>
               {/* CTA row sits 48px below the description; 32px between CTAs */}
               <div style={{ display: "flex", alignItems: "center", gap: 32, marginTop: 48, flexWrap: "wrap" }}>
-                <FlowCTA lottieSrc="/lotties/book-a-demo-trailing.json">Book a demo</FlowCTA>
+                <FlowCTA lottieSrc="/lotties/book-a-demo-trailing-v2.json">Book a demo</FlowCTA>
                 {/* "See the platform" — clean ghost link by default. On hover:
                     scale 1.04, persimmon fill rises bottom→top across the text,
                     and the trailing arrow slides in. Implemented as the
@@ -1157,20 +1183,8 @@ function Hero() {
             IO with negative bottom rootMargin treats bottom-pinned elements
             as "below the effective viewport" until the user scrolls. */}
         <div style={{ paddingTop: 24 }}>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 15,
-              letterSpacing: "-0.01em",
-              color: "currentColor",
-              opacity: 0.55,
-              fontWeight: 400,
-              marginBottom: 24,
-              textAlign: "center",
-            }}
-          >
-            Powering 680 restaurants from emerging brands to enterprise chains
-          </div>
+          {/* Eyebrow "Powering 680 restaurants…" removed — the logo
+              carousel stands on its own without the prefatory line. */}
           <LogoCarousel />
         </div>
       </Container>
@@ -1843,9 +1857,9 @@ function StatsBar() {
 //
 //  Dark-mode compatible: section has NO own bg (lets the wrapper bg show
 //  through), all text uses currentColor, the visual card uses a subtle
-//  accent tint that reads on both light and dark, and the stat callout
-//  uses a theme-following `.benefit-stat-callout` CSS class so it crossfades
-//  in lockstep with the wrapper as the user enters AI Catalogue (dark).
+//  accent tint that reads on both light and dark. Floating stat callouts
+//  were removed — the lottie placeholders read as the single visual focal
+//  point.
 // =========================================================
 function Benefits() {
   const ref = useRef(null);
@@ -1863,10 +1877,9 @@ function Benefits() {
       body:
         "Nova replaces 10–18 disconnected restaurant systems with one AI-native operating system — covering POS, digital ordering, kitchen, loyalty, workforce management, and real-time analytics.",
       proof: [
-        "Modern POS built for speed and scale",
+        "Modern POS and Kitchen Display System built for speed and scale",
         "Online ordering, mobile app, kiosk, and drive-thru unified",
         "Loyalty and guest data connected across every channel",
-        "Kitchen Display System integrated with every ordering source",
       ],
       statV: "7–10+",
       statL: "legacy vendors replaced in typical enterprise deployments",
@@ -1887,10 +1900,9 @@ function Benefits() {
       body:
         "Nova brings AI directly into restaurant operations across ordering, labor, guest engagement, and real-time decision making.",
       proof: [
-        "AI Voice captures phone and drive-thru orders 24/7",
+        "AI Voice and Vision capture phone and drive-thru orders 24/7",
         "AI Insights surface sales, menu, and operational opportunities in real time",
-        "AI Labor Optimization improves staffing efficiency",
-        "AI Operations detects voids, comps, and issues instantly",
+        "AI optimizes staffing efficiency and flags voids, comps, and issues instantly",
       ],
       statV: "+18%",
       statL: "in sales from a single Reporting AI insight",
@@ -1913,8 +1925,7 @@ function Benefits() {
       proof: [
         "AI-driven upsell based on guest behavior",
         "Smarter campaigns powered by real-time customer data",
-        "Connected loyalty across digital and in-store channels",
-        "Consistent guest experiences across every touchpoint",
+        "Connected loyalty and consistent guest experiences across every digital and in-store touchpoint",
       ],
       statV: "+7.4%",
       statL: "average ticket lift from AI-powered upsell across every channel",
@@ -1960,7 +1971,15 @@ function Benefits() {
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <PhaseTransition phaseKey={phaseIndex} duration={700}>
                 <BiMaskReveal delay={0}>
-                  <Heading size={52} color="currentColor">
+                  {/* paddingBottom on the Heading gives the BiMaskReveal
+                      clip-path enough room to clear descenders ("y", "g",
+                      "p"). At lineHeight 1.0 the descender otherwise sits
+                      below the element box and gets clipped. */}
+                  <Heading
+                    size={52}
+                    color="currentColor"
+                    style={{ lineHeight: 1.10, paddingBottom: 4 }}
+                  >
                     {p.title}
                   </Heading>
                 </BiMaskReveal>
@@ -2049,6 +2068,9 @@ function BenefitVisualPlaceholder({ tag, tone, statV, statL }) {
   // Tone tints — accent-color gradients with no hard-coded bg end stop,
   // so they fade naturally into whatever wrapper bg sits behind them
   // (light during Benefits, dark mid-transition into AI Catalogue).
+  // `statV` / `statL` are still accepted on the prop API but no longer
+  // rendered — the floating stat callouts were removed per direction so
+  // the lottie placeholders read as the single visual focal point.
   const tones = {
     warm: "linear-gradient(150deg, rgba(241,120,87,0.22) 0%, rgba(241,120,87,0) 100%)",
     cool: "linear-gradient(150deg, rgba(106,67,216,0.22) 0%, rgba(106,67,216,0) 100%)",
@@ -2068,45 +2090,6 @@ function BenefitVisualPlaceholder({ tag, tone, statV, statL }) {
       }}
     >
       <PlaceholderTag>{tag}</PlaceholderTag>
-      {/* Stat callout — theme-following bg/border via .benefit-stat-callout
-          class. Crossfades light → dark in lockstep with the wrapper. */}
-      <div
-        className="benefit-stat-callout"
-        style={{
-          position: "absolute",
-          right: 28,
-          bottom: 28,
-          padding: "16px 20px",
-          borderRadius: 16,
-          maxWidth: 280,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontSize: 28,
-            lineHeight: 1.0,
-            letterSpacing: "-0.03em",
-            fontWeight: 500,
-            color: T.persimmon600,
-            marginBottom: 6,
-          }}
-        >
-          {statV}
-        </div>
-        <div
-          style={{
-            fontFamily: FONT_BODY,
-            fontSize: 12,
-            lineHeight: 1.45,
-            color: "currentColor",
-            opacity: 0.72,
-            letterSpacing: "-0.005em",
-          }}
-        >
-          {statL}
-        </div>
-      </div>
     </div>
   );
 }
@@ -2563,39 +2546,11 @@ function MercuryAICard({ title, subtext, tagline, accent, chipText, chipTextLigh
         </div>
       </div>
 
-      {/* Tagline chip + title + subtext below the visual.
-          The tagline chip sits ABOVE the title and uses a vertical
-          gradient (accent at 10% alpha top → 0% bottom) plus a lighter
-          accent text color — reads as a quiet proof badge that
-          stays visually balanced against the dark AI section bg. */}
+      {/* Title + subtext below the visual. Tagline chip removed per board
+          direction — the per-card proof badges added noise upfront and
+          the headline alone reads cleaner. The `tagline` prop is kept on
+          the data so we can revive it later without re-plumbing. */}
       <div>
-        {tagline && (
-          <div style={{ marginBottom: 14 }}>
-            <span
-              className="ai-tagline-chip"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "5px 12px",
-                borderRadius: 999,
-                background: `linear-gradient(180deg, ${accent}1A 0%, ${accent}00 100%)`,
-                border: `1px solid ${accent}29`,
-                fontFamily: FONT_BODY,
-                fontSize: 12.5,
-                lineHeight: 1.3,
-                fontWeight: 500,
-                letterSpacing: "-0.005em",
-                whiteSpace: "nowrap",
-                // CSS custom properties consumed by .ai-tagline-chip — light
-                // mode picks --chip-light, dark mode picks --chip-dark.
-                "--chip-dark": chipText || accent,
-                "--chip-light": chipTextLight || accent,
-              }}
-            >
-              {tagline}
-            </span>
-          </div>
-        )}
         <div
           style={{
             fontSize: 22,
@@ -3433,8 +3388,8 @@ function HowItWorks() {
   const steps = [
     {
       kicker: "Step 01 · Connect",
-      title: "Launch in days, not quarters.",
-      body: "Launch quickly with digital ordering, mobile, loyalty, and analytics using your existing infrastructure.",
+      title: "Plug into your stack. Keep what works.",
+      body: "Nova's digital front — online ordering, mobile app, loyalty, and analytics — sits on top of the systems you already run. No rip-and-replace. Roll it out brand-by-brand, region-by-region, on the timeline your operations team is comfortable with.",
       accent: T.persimmon500,
     },
     {
@@ -4015,12 +3970,9 @@ function FinalCTA() {
           the persimmon/nebula blooms competing with the CTA. */}
       <Container narrow>
         <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-          <ScrollReveal>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: T.persimmon500, fontWeight: 500, marginBottom: 32 }}>
-              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: T.persimmon500, marginRight: 12, verticalAlign: "middle" }} />
-              Book a demo
-            </div>
-          </ScrollReveal>
+          {/* "Book a demo" eyebrow with the persimmon dot removed — the
+              section's intent is already clear from the Display headline
+              and the primary CTA below it. */}
           <ScrollReveal delay={80}>
             <Display size={72} color={T.whisper}>
               See how modern restaurant operations <span style={{ color: T.persimmon500 }}>run on Nova</span>.
@@ -4035,7 +3987,7 @@ function FinalCTA() {
               shadow render without any clip-path interference. */}
           <FadeReveal delay={240}>
             <div style={{ marginTop: 44, display: "flex", gap: 12, justifyContent: "center" }}>
-              <FlowCTA onDark lottieSrc="/lotties/book-a-demo-trailing.json">Book a demo</FlowCTA>
+              <FlowCTA onDark lottieSrc="/lotties/book-a-demo-trailing-v2.json">Book a demo</FlowCTA>
               <Button variant="invertGhost">Talk to sales</Button>
             </div>
           </FadeReveal>
@@ -4079,7 +4031,17 @@ function Footer() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <Button variant="primary">Book a demo</Button>
+            <Button
+              variant="primary"
+              lottieSrc="/lotties/book-a-demo-arrowless-v2.json"
+              style={{
+                // -2px horizontal padding (20 → 18) so the Lottie's authored
+                // canvas aligns perfectly with the button bounds.
+                padding: "10px 18px",
+              }}
+            >
+              Book a demo
+            </Button>
             <Button variant="invertGhost">Sign in</Button>
           </div>
         </div>
