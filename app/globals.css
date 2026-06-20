@@ -85,6 +85,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* `clip` does NOT establish a scroll container, so sticky stays intact. */
   overflow-x: clip;
+  /* Match the wrapper's 900ms theme fade so the small horizontal strip
+     that the body can show (where Hero's scaled lottie extends past the
+     wrapper's right edge near the scrollbar) doesn't read as a bright
+     light gap against the dark canvas. */
+  transition: background-color 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Body bg follows the wrapper [data-theme] via :has so the dark canvas
+   covers the full viewport width even when scaled hero artwork or any
+   off-viewport element extends past the wrapper's natural bounds. */
+body:has([data-theme="dark"]) {
+  background: #171721;
 }
 
 /* Hide scrollbars for horizontal-scroll bento shelves */
@@ -499,6 +510,57 @@ body {
 .logo-fade-right.logo-fade-dark  { background: linear-gradient(270deg, #171721 0%, rgba(23,23,33,0)   100%); }
 [data-theme="dark"] .logo-fade-light { opacity: 0; }
 [data-theme="dark"] .logo-fade-dark  { opacity: 1; }
+
+/* =========================================================
+   Hero lottie · right-edge bleed fade
+   The hero collage is scaled 1.2x rightward (transform-origin
+   left center) so the artwork extends past its layout column —
+   makes the imagery feel larger without changing the page's
+   horizontal rhythm. These overlays fade the rightmost portion
+   of the (scaled) lottie back into the page background so the
+   protrusion melts away cleanly at the section's right margin.
+   Multi-stop ramps to keep the falloff smooth; light + dark
+   layers crossfade via [data-theme] in lockstep with the
+   wrapper's 900ms color transition.
+   ========================================================= */
+.hero-lottie-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  /* Width is a % of the scaled wrapper, which is 1.2x the layout
+     column — so 50% here visually covers ~60% of the column-width
+     equivalent on the right. Comfortable falloff distance. */
+  width: 50%;
+  pointer-events: none;
+  transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+  z-index: 2;
+}
+.hero-lottie-fade-light {
+  opacity: 1;
+  background: linear-gradient(
+    to right,
+    rgba(250, 250, 251, 0)    0%,
+    rgba(250, 250, 251, 0.30) 35%,
+    rgba(250, 250, 251, 0.75) 65%,
+    rgba(250, 250, 251, 0.95) 85%,
+    rgba(250, 250, 251, 1)    100%
+  );
+}
+.hero-lottie-fade-dark {
+  opacity: 0;
+  background: linear-gradient(
+    to right,
+    rgba(23, 23, 33, 0)    0%,
+    rgba(23, 23, 33, 0.30) 35%,
+    rgba(23, 23, 33, 0.75) 65%,
+    rgba(23, 23, 33, 0.95) 85%,
+    rgba(23, 23, 33, 1)    100%
+  );
+}
+[data-theme="dark"] .hero-lottie-fade-light { opacity: 0; }
+[data-theme="dark"] .hero-lottie-fade-dark  { opacity: 1; }
 
 /*
  * Seamless marquee.

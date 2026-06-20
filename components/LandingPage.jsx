@@ -19,6 +19,7 @@ import {
 import { T, FONT_DISPLAY, FONT_BODY, FONT_MONO } from "@/lib/tokens";
 import { useScrollY, useSectionProgress, useScrollTheme, useMouseParallax } from "@/lib/hooks";
 import LottiePlayer from "./LottiePlayer";
+import DotLottiePlayer from "./DotLottiePlayer";
 import NovaDotfield from "./NovaDotfield";
 
 // =========================================================
@@ -869,6 +870,17 @@ function LogoMark({ size = 28 }) {
 export default function LandingPage() {
   const theme = useScrollTheme("light");
   const isDark = theme === "dark";
+  // Sync body bg to the current theme so the strip behind the wrapper
+  // (e.g. where the hero's scaled lottie overflows past the wrapper's
+  // right edge near the scrollbar) doesn't render the default light
+  // canvas against a dark section. Css :has didn't take in this
+  // codebase — set it imperatively here.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.backgroundColor = isDark ? "#171721" : T.canvas;
+    document.body.style.transition =
+      "background-color 900ms cubic-bezier(0.4, 0, 0.2, 1)";
+  }, [isDark]);
   return (
     <div
       data-theme={theme}
@@ -1057,6 +1069,12 @@ function Hero() {
       <NovaDotfield />
       <div className="hero-vignette hero-vignette-light" aria-hidden />
       <div className="hero-vignette hero-vignette-dark" aria-hidden />
+      {/* Hero uses the site-standard Container (1240 max / 40 padding)
+          so its left/right margins line up with every other section
+          (Benefits, AI Catalogue, Segmenter, HowItWorks, Customer
+          Outcomes, FinalCTA, Footer). Inner grid + lottie cap take
+          care of letting the artwork still feel substantial within
+          those standard margins. */}
       <Container
         style={{
           position: "relative",
@@ -1070,39 +1088,24 @@ function Hero() {
       >
         {/* 2-column grid: text content left, collage Lottie right. flex:1
             so this block fills the available height; the KPI bar that
-            follows sits naturally at the bottom of the viewport. */}
+            follows sits naturally at the bottom of the viewport. Lottie
+            column gets the larger share (1fr / 1.25fr) since the artwork
+            is the visual anchor of the hero. alignItems:center keeps the
+            text block vertically centred against whatever height the
+            scaled-up lottie ends up at. */}
         <div
           style={{
             flex: 1,
             display: "grid",
-            gridTemplateColumns: "1.1fr 1fr",
-            gap: 64,
+            gridTemplateColumns: "1fr 1.25fr",
+            gap: 56,
             alignItems: "center",
           }}
         >
           {/* LEFT · text content */}
           <div>
-            <ScrollReveal>
-              {/* Eyebrow — small monospace label that anchors the page */}
-              <div
-                style={{
-                  fontFamily: FONT_MONO,
-                  fontSize: 11,
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  color: T.persimmon600,
-                  fontWeight: 600,
-                  marginBottom: 24,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: T.persimmon600 }} />
-                The AI Restaurant OS · 2026
-              </div>
-            </ScrollReveal>
-
+            {/* "The AI Restaurant OS · 2026" eyebrow removed per direction —
+                the headline carries the section on its own. */}
             <ScrollReveal delay={80}>
               <h1
                 style={{
@@ -1166,14 +1169,54 @@ function Hero() {
 
           </div>
 
-          {/* RIGHT · Lottie collage placeholder slot.
-              Team is delivering a single Lottie. For now we render a clean
-              4-cell ghost grid sized to the eventual aspect, with a subtle
-              "Lottie · Hero collage" placeholder label so it's obvious this
-              is intentional. Swap the placeholder for <LottiePlayer src="..." />
-              when the file lands. */}
+          {/* RIGHT · Hero collage Lottie.
+              Layout slot keeps its column footprint (so the grid and
+              page rhythm don't shift), but the inner wrapper is scaled
+              1.2x anchored at left-center via CSS transform — the
+              lottie visually extends past the column's right edge by
+              ~20% of its width. overflow:visible on the slot lets the
+              extra width render outside the layout box.
+              The .hero-lottie-fade overlays sit inside the scaled
+              wrapper so they scale with the lottie. They paint a
+              4-stop linear gradient from transparent → page bg color
+              on the rightmost half, melting the protruding portion
+              back into the canvas so the visual margin appears intact
+              even though the artwork physically extends past it. */}
           <FadeReveal delay={200}>
-            <HeroCollagePlaceholder />
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 710,
+                aspectRatio: "1208 / 996",
+                marginLeft: "auto",
+                position: "relative",
+                overflow: "visible",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  // Scaled 1.08x (down 10% from the prior 1.2x) anchored
+                  // at left center so the artwork still bleeds rightward
+                  // past the column edge, just more subtly. Fade overlays
+                  // intentionally removed here to preview the raw
+                  // protrusion — CSS classes (.hero-lottie-fade-*)
+                  // remain in globals.css and can be re-added when we
+                  // want to soften the right edge again.
+                  transform: "scale(1.08)",
+                  transformOrigin: "left center",
+                }}
+              >
+                <LottiePlayer
+                  src="/lotties/hero/hero-03.json"
+                  loop
+                  autoplay
+                  ariaLabel="Nova hero collage animation"
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+                />
+              </div>
+            </div>
           </FadeReveal>
         </div>
 
@@ -1960,8 +2003,14 @@ function Benefits() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 80,
+              // 5fr / 7fr gives the right column ~40% more width than the
+              // left, scaling all 8 Lottie layers in lockstep (they're
+              // each absolutely positioned at inset:0 / width 100% on the
+              // shared 1:1 BenefitsVisual container, so any width change
+              // applies uniformly — no risk of breaking transition
+              // alignment across layers).
+              gridTemplateColumns: "5fr 7fr",
+              gap: 64,
               alignItems: "stretch",
               minHeight: 520,
             }}
@@ -1976,15 +2025,15 @@ function Benefits() {
                       "p"). At lineHeight 1.0 the descender otherwise sits
                       below the element box and gets clipped. */}
                   <Heading
-                    size={52}
+                    size={40}
                     color="currentColor"
-                    style={{ lineHeight: 1.10, paddingBottom: 4 }}
+                    style={{ lineHeight: 1.12, paddingBottom: 4 }}
                   >
                     {p.title}
                   </Heading>
                 </BiMaskReveal>
                 <BiMaskReveal delay={140}>
-                  <Body size={17} color="currentColor" style={{ marginTop: 24, maxWidth: 480, opacity: 0.72 }}>
+                  <Body size={17} color="currentColor" style={{ marginTop: 12, maxWidth: 480, opacity: 0.72 }}>
                     {p.body}
                   </Body>
                 </BiMaskReveal>
@@ -2045,22 +2094,235 @@ function Benefits() {
               </PhaseTransition>
             </div>
 
-            {/* RIGHT — visual placeholder. Same PhaseTransition pattern
-                so the visual + stat callout crossfade alongside the
-                content. Equal height to the left column for visual balance. */}
-            <PhaseTransition phaseKey={phaseIndex} duration={700}>
-              <BenefitVisualPlaceholder
-                key={p.key}
-                tag={p.placeholderTag}
-                tone={p.tone}
-                statV={p.statV}
-                statL={p.statL}
-              />
-            </PhaseTransition>
+            {/* RIGHT — Lottie stage. Mounted ONCE (no PhaseTransition
+                wrapper) so the inner state machine maintains continuity
+                across phase boundaries — transitions need access to the
+                previous step to know which forward/reverse lottie to
+                play, and the theme-aware P03 variants need to know the
+                current frame to sync across the light/dark swap. */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <BenefitsVisual phaseIndex={phaseIndex} />
+            </div>
           </div>
         </Container>
       </div>
     </section>
+  );
+}
+
+// =========================================================
+//  BENEFITSVISUAL — Scroll-synced + theme-aware Lottie stage
+//
+//  Mirror of HowVisual (same trigger-and-play model, same outgoing-layer
+//  reset to kill blinks in both scroll directions) but with one extra
+//  wrinkle: phase 3 has TWO idle variants (P03 light + P03 dark).
+//  The active variant follows the page's wrapper theme — when the user
+//  scrolls down out of Benefits and the wrapper [data-theme] flips
+//  light → dark on the way into AI Catalogue, the dark P03 takes over;
+//  when they scroll back up, light P03 returns.
+//
+//  Variant swap is frame-synced (the incoming variant resumes from the
+//  outgoing variant's exact frame) so the visual continues without a
+//  mid-loop restart — the user only perceives a color change.
+//
+//  All other layers (P01/P02/P03-light/P03-dark idles + 4 transitions)
+//  follow the same imperative goToAndPlay(0)-before-state-flip pattern
+//  HowVisual uses, so every becomes-visible event lands on a known frame.
+// =========================================================
+function BenefitsVisual({ phaseIndex }) {
+  // Theme tracked independently here so we can swap P03 variants the
+  // moment the wrapper [data-theme] flips. Cost = one extra rAF-throttled
+  // scroll listener — negligible.
+  const theme = useScrollTheme("light");
+
+  const [activeIdle, setActiveIdle] = useState(0);
+  const [transition, setTransition] = useState(null);
+  const prevStepRef = useRef(0);
+
+  // Imperative refs. Idle slot 2 holds both P03 variants since they
+  // collapse to a single "phase 3" stage with theme-driven variant swap.
+  const idleRefs = useRef({ 0: null, 1: null, "2-light": null, "2-dark": null });
+  const transitionRefs = useRef({});
+
+  // Previous-visibility trackers for the outgoing-layer reset
+  // (frame-0 prime on becoming invisible, same pattern as HowVisual).
+  const prevVisibleIdleRef = useRef(0);
+  const prevVisibleP03ThemeRef = useRef(theme);
+  const prevVisibleTransitionRef = useRef(null);
+
+  const slugFor = (from, to) => {
+    const forward = to > from;
+    return forward
+      ? `p0${from + 1}-p0${to + 1}`
+      : `reverse-p0${from + 1}-p0${to + 1}`;
+  };
+
+  // Scroll-driven phase changes — same logic as HowVisual.
+  useEffect(() => {
+    const prev = prevStepRef.current;
+    if (prev === phaseIndex) return;
+    prevStepRef.current = phaseIndex;
+    if (transition) return;
+    const next = prev + (phaseIndex > prev ? 1 : -1);
+    const transKey = slugFor(prev, next);
+    transitionRefs.current[transKey]?.goToAndPlay(0, true);
+    setTransition({
+      key: transKey,
+      playKey: Date.now(),
+      destStep: next,
+    });
+  }, [phaseIndex, transition]);
+
+  // Frame-sync the P03 variants when the wrapper theme flips while
+  // phase 3 is the active idle. Without this, the incoming variant
+  // would jump back to frame 0 mid-loop on every theme change.
+  useEffect(() => {
+    const onP03 = !transition && activeIdle === 2;
+    const wasP03 = prevVisibleIdleRef.current === 2;
+    if (!onP03 || !wasP03) {
+      prevVisibleP03ThemeRef.current = theme;
+      return;
+    }
+    const prevTheme = prevVisibleP03ThemeRef.current;
+    if (prevTheme === theme) return;
+    const outgoingKey = prevTheme === "dark" ? "2-dark" : "2-light";
+    const incomingKey = theme === "dark" ? "2-dark" : "2-light";
+    // Read the frame the outgoing variant is on, then start the
+    // incoming variant at that exact frame so the swap is invisible
+    // (assuming the two assets share a timeline, which they do — the
+    // artist exported them from the same source with different colors).
+    const frame = idleRefs.current[outgoingKey]?.getCurrentFrame() ?? 0;
+    idleRefs.current[incomingKey]?.goToAndPlay(frame, true);
+    idleRefs.current[outgoingKey]?.goToAndStop(0, true);
+    prevVisibleP03ThemeRef.current = theme;
+  }, [theme, activeIdle, transition]);
+
+  const onTransitionComplete = () => {
+    if (!transition) return;
+    const dest = transition.destStep;
+    const latest = prevStepRef.current;
+
+    if (dest === latest) {
+      // Hand off to the dest idle. For phase 3 we pick the variant
+      // matching the current theme.
+      const destKey = dest === 2 ? (theme === "dark" ? "2-dark" : "2-light") : dest;
+      idleRefs.current[destKey]?.goToAndPlay(0, true);
+      setActiveIdle(dest);
+      setTransition(null);
+    } else {
+      const nextDest = dest + (latest > dest ? 1 : -1);
+      const nextKey = slugFor(dest, nextDest);
+      transitionRefs.current[nextKey]?.goToAndPlay(0, true);
+      setActiveIdle(dest);
+      setTransition({
+        key: nextKey,
+        playKey: Date.now(),
+        destStep: nextDest,
+      });
+    }
+  };
+
+  // Outgoing-layer cleanup — same pattern as HowVisual.
+  useEffect(() => {
+    const currentIdle = transition ? null : activeIdle;
+    const prevIdle = prevVisibleIdleRef.current;
+    if (prevIdle !== null && prevIdle !== currentIdle) {
+      // The idle we're leaving — for phase 3, only reset the variant
+      // that was actually visible.
+      const outgoingKey = prevIdle === 2 ? (prevVisibleP03ThemeRef.current === "dark" ? "2-dark" : "2-light") : prevIdle;
+      try { idleRefs.current[outgoingKey]?.goToAndStop(0, true); } catch (e) { /* noop */ }
+    }
+    prevVisibleIdleRef.current = currentIdle;
+
+    const currentTrans = transition?.key || null;
+    const prevTrans = prevVisibleTransitionRef.current;
+    if (prevTrans && prevTrans !== currentTrans) {
+      try { transitionRefs.current[prevTrans]?.goToAndStop(0, true); } catch (e) { /* noop */ }
+    }
+    prevVisibleTransitionRef.current = currentTrans;
+  }, [activeIdle, transition]);
+
+  const transitionKeys = [
+    "p01-p02",
+    "p02-p03",
+    "reverse-p02-p01",
+    "reverse-p03-p02",
+  ];
+
+  const onPhase3 = !transition && activeIdle === 2;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: "1 / 1",
+        margin: "0 auto",
+      }}
+    >
+      {/* Idle P01 */}
+      <LottiePlayer
+        key="b-idle-0"
+        ref={(el) => { idleRefs.current[0] = el; }}
+        src="/lotties/benefits/p01.json"
+        loop
+        autoplay
+        paused={!(!transition && activeIdle === 0)}
+        ariaLabel="Benefit 01 platform consolidation idle animation"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: !transition && activeIdle === 0 ? 1 : 0, pointerEvents: "none" }}
+      />
+      {/* Idle P02 */}
+      <LottiePlayer
+        key="b-idle-1"
+        ref={(el) => { idleRefs.current[1] = el; }}
+        src="/lotties/benefits/p02.json"
+        loop
+        autoplay={false}
+        paused={!(!transition && activeIdle === 1)}
+        ariaLabel="Benefit 02 AI at the core idle animation"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: !transition && activeIdle === 1 ? 1 : 0, pointerEvents: "none" }}
+      />
+      {/* Idle P03 — Light variant */}
+      <LottiePlayer
+        key="b-idle-2-light"
+        ref={(el) => { idleRefs.current["2-light"] = el; }}
+        src="/lotties/benefits/p03-light.json"
+        loop
+        autoplay={false}
+        paused={!(onPhase3 && theme === "light")}
+        ariaLabel="Benefit 03 guest personalization (light) idle animation"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: onPhase3 && theme === "light" ? 1 : 0, pointerEvents: "none" }}
+      />
+      {/* Idle P03 — Dark variant */}
+      <LottiePlayer
+        key="b-idle-2-dark"
+        ref={(el) => { idleRefs.current["2-dark"] = el; }}
+        src="/lotties/benefits/p03-dark.json"
+        loop
+        autoplay={false}
+        paused={!(onPhase3 && theme === "dark")}
+        ariaLabel="Benefit 03 guest personalization (dark) idle animation"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: onPhase3 && theme === "dark" ? 1 : 0, pointerEvents: "none" }}
+      />
+      {/* Transitions */}
+      {transitionKeys.map((tKey) => {
+        const active = transition?.key === tKey;
+        return (
+          <LottiePlayer
+            key={`b-trans-${tKey}`}
+            ref={(el) => { transitionRefs.current[tKey] = el; }}
+            src={`/lotties/benefits/${tKey}.json`}
+            loop={false}
+            autoplay={false}
+            paused={!active}
+            playKey={active ? transition.playKey : 0}
+            onComplete={active ? onTransitionComplete : undefined}
+            ariaLabel={`Benefits transition ${tKey}`}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: active ? 1 : 0, pointerEvents: "none" }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -2303,7 +2565,8 @@ function AICatalogue() {
       accent: T.persimmon500,
       chipText: "#F8AA94",
       chipTextLight: "#D43F39",
-      visual: <UpsellVizLarge accent={T.persimmon500} />,
+      visual: <UpsellVizLarge />,
+      bareVisual: true,
     },
     {
       key: "insights",
@@ -2313,7 +2576,8 @@ function AICatalogue() {
       accent: T.cobalt500,
       chipText: "#8FB8F2",
       chipTextLight: "#2A60C0",
-      visual: <InsightsVizLarge accent={T.cobalt500} />,
+      visual: <InsightsVizLarge />,
+      bareVisual: true,
     },
     {
       key: "vision",
@@ -2323,7 +2587,8 @@ function AICatalogue() {
       accent: T.matcha500,
       chipText: "#9BD5B4",
       chipTextLight: "#3A8C66",
-      visual: <VisionVizLarge accent={T.matcha500} />,
+      visual: <VisionVizLarge />,
+      bareVisual: true,
     },
     {
       key: "copilot",
@@ -2333,7 +2598,8 @@ function AICatalogue() {
       accent: T.saffron500,
       chipText: "#F0D17C",
       chipTextLight: "#A06A12",
-      visual: <CopilotVizLarge accent={T.saffron500} />,
+      visual: <CopilotVizLarge />,
+      bareVisual: true,
     },
     {
       key: "campaigns",
@@ -2343,7 +2609,8 @@ function AICatalogue() {
       accent: T.persimmon500,
       chipText: "#F8AA94",
       chipTextLight: "#D43F39",
-      visual: <CampaignsVizLarge accent={T.persimmon500} />,
+      visual: <CampaignsVizLarge />,
+      bareVisual: true,
     },
   ];
   return (
@@ -2628,191 +2895,111 @@ function VoiceVizLarge() {
   );
 }
 
-function UpsellVizLarge({ accent }) {
+// =========================================================
+//  AI CATALOGUE LOTTIE TILES — Voice AI pattern, generalized
+//
+//  Each of the 5 (formerly 6 — Voice AI keeps its own VoiceVizLarge for
+//  the centered-overlay quirk) AI Catalogue cards now follows the same
+//  bg-poster + Lottie-overlay pattern: an artist-authored 396×416 SVG
+//  background fills the card edge-to-edge, with the matching 396×416
+//  Lottie animation stacked at the exact same dimensions. Both layers
+//  are absolutely positioned at inset:0 / objectFit:cover so they remain
+//  pixel-aligned across viewports. Used with `bareVisual: true` on the
+//  MercuryAICard so there's no frame chrome competing with the artwork.
+// =========================================================
+function AICatLottieViz({ bg, src, label }) {
+  // Uses DotLottiePlayer (wasm-based @lottiefiles/dotlottie-react) rather
+  // than the lottie-web-based LottiePlayer used elsewhere on the page.
+  // Two of the artist's six AI Catalogue lotties (Upsell + Sales Insights)
+  // exercise precomp evaluation paths that lottie-web's classic SVG/canvas
+  // renderer doesn't populate correctly — the precomp's `<g>` ends up
+  // empty even though `firstFrame`/`currentFrame` advance correctly. The
+  // dotlottie wasm renderer handles the same files without modification,
+  // so we just use it for all 6 cards for consistency.
   return (
-    <svg viewBox="0 0 320 320" style={{ width: "75%", height: "75%" }}>
-      <defs>
-        <linearGradient id="up-card-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.95" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0.55" />
-        </linearGradient>
-        <linearGradient id="up-arrow-grad" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor={accent} stopOpacity="0" />
-          <stop offset="100%" stopColor={accent} stopOpacity="1" />
-        </linearGradient>
-      </defs>
-      {/* stacked tickets */}
-      <rect x="60"  y="200" width="180" height="60" rx="12" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" />
-      <rect x="70"  y="170" width="180" height="60" rx="12" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.12)" />
-      <rect x="80"  y="140" width="180" height="60" rx="12" fill="url(#up-card-grad)" />
-      {/* big % on top card */}
-      <text x="170" y="178" textAnchor="middle" fontSize="22" fontWeight="700" fill="#fff" fontFamily="'Söhne', Inter, sans-serif" letterSpacing="-0.04em">+7.4%</text>
-      <text x="170" y="192" textAnchor="middle" fontSize="10" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif" opacity="0.85" letterSpacing="0.08em">AVG TICKET</text>
-      {/* rising arrow trail */}
-      <path d="M 50 290 Q 110 250, 160 220 T 280 90" stroke="url(#up-arrow-grad)" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <circle cx="280" cy="90" r="6" fill={accent} />
-      <circle cx="280" cy="90" r="13" fill="none" stroke={accent} strokeOpacity="0.4" />
-      <path d="M 270 80 L 280 90 L 290 80" stroke={accent} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <>
+      <img
+        src={bg}
+        alt=""
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          pointerEvents: "none",
+        }}
+      />
+      <DotLottiePlayer
+        src={src}
+        loop
+        autoplay
+        ariaLabel={label}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      />
+    </>
   );
 }
 
-function InsightsVizLarge({ accent }) {
+function UpsellVizLarge() {
   return (
-    <svg viewBox="0 0 320 320" style={{ width: "82%", height: "82%" }}>
-      <defs>
-        <linearGradient id="ins-area" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.45" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* baseline grid */}
-      {[60, 110, 160, 210, 260].map((y) => (
-        <line key={y} x1="30" y1={y} x2="290" y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" strokeDasharray="2 4" />
-      ))}
-      {/* area fill */}
-      <path d="M 30 230 C 70 220, 100 200, 130 180 S 200 100, 240 70 L 290 50 L 290 270 L 30 270 Z" fill="url(#ins-area)" />
-      {/* line */}
-      <path d="M 30 230 C 70 220, 100 200, 130 180 S 200 100, 240 70 L 290 50" stroke={accent} strokeWidth="2.4" fill="none" strokeLinecap="round" />
-      {/* peak marker */}
-      <circle cx="240" cy="70" r="6" fill={accent} />
-      <circle cx="240" cy="70" r="14" fill="none" stroke={accent} strokeOpacity="0.35" />
-      {/* insight pill callout */}
-      <g transform="translate(140, 28)">
-        <rect x="0" y="0" width="120" height="32" rx="16" fill={accent} fillOpacity="0.18" stroke={accent} strokeOpacity="0.5" />
-        <circle cx="14" cy="16" r="4" fill={accent} />
-        <text x="26" y="20" fontSize="11" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif" letterSpacing="-0.005em">+18% sales lift</text>
-      </g>
-    </svg>
+    <AICatLottieViz
+      bg="/lotties/menu-upsell-bg.svg"
+      src="/lotties/ai-catalogue/upsell.json"
+      label="Automated Upsell & Cross-Sell animation"
+    />
   );
 }
 
-function VisionVizLarge({ accent }) {
+function InsightsVizLarge() {
   return (
-    <svg viewBox="0 0 320 320" style={{ width: "76%", height: "76%" }}>
-      <defs>
-        <radialGradient id="vision-target" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.95" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0.3" />
-        </radialGradient>
-      </defs>
-      {/* camera-style frame with corner brackets */}
-      {[
-        "M 40 80 L 40 40 L 80 40",
-        "M 280 40 L 280 40 L 280 80 M 240 40 L 280 40",
-        "M 40 240 L 40 280 L 80 280",
-        "M 240 280 L 280 280 L 280 240",
-      ].map((d, i) => (
-        <path key={i} d={d} stroke={accent} strokeOpacity="0.7" strokeWidth="2" fill="none" strokeLinecap="round" />
-      ))}
-      {/* scan grid lines */}
-      {[100, 140, 180, 220].map((y) => (
-        <line key={y} x1="60" y1={y} x2="260" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" strokeDasharray="2 4" />
-      ))}
-      {/* detected boxes (table turn / line speed) */}
-      <rect x="76" y="100" width="64" height="48" rx="6" fill="none" stroke={accent} strokeOpacity="0.4" strokeWidth="1.2" />
-      <text x="84" y="116" fontSize="9" fontWeight="500" fill={accent} fontFamily="Inter, sans-serif" letterSpacing="0.06em">TABLE 04</text>
-      <rect x="160" y="160" width="80" height="56" rx="6" fill="none" stroke={accent} strokeOpacity="0.65" strokeWidth="1.5" />
-      <text x="168" y="176" fontSize="9" fontWeight="500" fill={accent} fontFamily="Inter, sans-serif" letterSpacing="0.06em">LINE · 3 MIN</text>
-      {/* target reticle in center */}
-      <circle cx="160" cy="160" r="14" fill="url(#vision-target)" />
-      <line x1="160" y1="148" x2="160" y2="172" stroke="#fff" strokeWidth="1.5" opacity="0.9" />
-      <line x1="148" y1="160" x2="172" y2="160" stroke="#fff" strokeWidth="1.5" opacity="0.9" />
-    </svg>
+    <AICatLottieViz
+      bg="/lotties/sales-insights-bg.svg"
+      src="/lotties/ai-catalogue/sales-insights.json"
+      label="Sales Insights & Recommendations animation"
+    />
   );
 }
 
-function CopilotVizLarge({ accent }) {
+function VisionVizLarge() {
+  // Card title is "Menu Engineering" — kept the legacy function name
+  // (VisionVizLarge) so the existing AICatalogue card array doesn't
+  // need to be reshuffled.
   return (
-    <svg viewBox="0 0 320 320" style={{ width: "78%", height: "78%" }}>
-      <defs>
-        <linearGradient id="copilot-bubble" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.95" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0.55" />
-        </linearGradient>
-      </defs>
-      {/* user bubble (top-right, smaller) */}
-      <rect x="120" y="60" width="170" height="46" rx="20" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)" />
-      <text x="138" y="79" fontSize="11" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif" opacity="0.9">Slowest item</text>
-      <text x="138" y="95" fontSize="11" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif" opacity="0.9">this lunch?</text>
-      {/* AI bubble (below-left, larger, accent-colored) */}
-      <rect x="30" y="130" width="240" height="100" rx="22" fill="url(#copilot-bubble)" />
-      {/* sparkle */}
-      <g transform="translate(50, 152)">
-        <path d="M 8 0 L 10 6 L 16 8 L 10 10 L 8 16 L 6 10 L 0 8 L 6 6 Z" fill="#fff" />
-      </g>
-      <text x="78" y="158" fontSize="11" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif" letterSpacing="0.04em">NOVA COPILOT</text>
-      <text x="50" y="184" fontSize="12" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif">Lobster roll — 11.4 min</text>
-      <text x="50" y="204" fontSize="11" fontWeight="400" fill="#fff" fontFamily="Inter, sans-serif" opacity="0.85">vs 6 min target. Want me to</text>
-      <text x="50" y="218" fontSize="11" fontWeight="400" fill="#fff" fontFamily="Inter, sans-serif" opacity="0.85">flag prep for tomorrow?</text>
-      {/* typing dots */}
-      <g transform="translate(140, 264)">
-        <circle cx="0"  cy="0" r="4" fill={accent} opacity="0.95" />
-        <circle cx="14" cy="0" r="4" fill={accent} opacity="0.65" />
-        <circle cx="28" cy="0" r="4" fill={accent} opacity="0.35" />
-      </g>
-    </svg>
+    <AICatLottieViz
+      bg="/lotties/menu-engineering-bg.svg"
+      src="/lotties/ai-catalogue/menu-engineering.json"
+      label="Menu Engineering animation"
+    />
   );
 }
 
-function CampaignsVizLarge({ accent }) {
+function CopilotVizLarge() {
+  // Card title is "Staff Scheduling Optimization" — legacy function
+  // name from when this slot was a hypothetical Manager Copilot.
   return (
-    <svg viewBox="0 0 320 320" style={{ width: "78%", height: "78%" }}>
-      <defs>
-        <radialGradient id="camp-hub" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={accent} stopOpacity="0.9" />
-          <stop offset="100%" stopColor={accent} stopOpacity="0.5" />
-        </radialGradient>
-      </defs>
-      {/* fanning lines from hub to audience nodes */}
-      {[
-        { x: 50, y: 80, label: "Lapsed VIPs", count: "2,140" },
-        { x: 270, y: 80, label: "First-time", count: "4,820" },
-        { x: 30, y: 230, label: "Weeknight", count: "1,510" },
-        { x: 290, y: 230, label: "Drive-thru", count: "8,930" },
-      ].map((n, i) => (
-        <g key={i}>
-          <line x1={n.x} y1={n.y} x2="160" y2="160" stroke={accent} strokeOpacity="0.35" strokeWidth="1.2" strokeDasharray="3 4" />
-          <rect
-            x={n.x < 160 ? n.x - 4 : n.x - 76}
-            y={n.y - 20}
-            width="80"
-            height="40"
-            rx="10"
-            fill="rgba(255,255,255,0.06)"
-            stroke="rgba(255,255,255,0.12)"
-          />
-          <text
-            x={n.x < 160 ? n.x + 4 : n.x - 68}
-            y={n.y - 4}
-            fontSize="9"
-            fontWeight="500"
-            fill="#fff"
-            fontFamily="Inter, sans-serif"
-            opacity="0.85"
-            letterSpacing="0.04em"
-          >
-            {n.label}
-          </text>
-          <text
-            x={n.x < 160 ? n.x + 4 : n.x - 68}
-            y={n.y + 11}
-            fontSize="11"
-            fontWeight="500"
-            fill={accent}
-            fontFamily="Inter, sans-serif"
-            letterSpacing="-0.02em"
-          >
-            {n.count}
-          </text>
-        </g>
-      ))}
-      {/* center hub */}
-      <circle cx="160" cy="160" r="46" fill="url(#camp-hub)" />
-      {/* paper-plane glyph */}
-      <path d="M 145 152 L 178 160 L 145 168 L 152 160 Z" fill="#fff" opacity="0.95" />
-      <text x="160" y="186" fontSize="9" fontWeight="500" fill="#fff" fontFamily="Inter, sans-serif" textAnchor="middle" opacity="0.9" letterSpacing="0.08em">AUTO-SENT</text>
-    </svg>
+    <AICatLottieViz
+      bg="/lotties/staff-scheduling-bg.svg"
+      src="/lotties/ai-catalogue/staff-scheduling.json"
+      label="Staff Scheduling Optimization animation"
+    />
+  );
+}
+
+function CampaignsVizLarge() {
+  return (
+    <AICatLottieViz
+      bg="/lotties/ai-campaigns-bg.svg"
+      src="/lotties/ai-catalogue/ai-campaigns.json"
+      label="AI Campaign Management animation"
+    />
   );
 }
 
@@ -3062,12 +3249,43 @@ function Segmenter() {
     },
   ];
   return (
-    <section data-section-theme="light" style={{ padding: "120px 0", position: "relative" }}>
+    // Section starts in DARK mode so the dark canvas continues through
+    // AI Catalogue → into the top of this section (eyebrow + headline)
+    // without an early theme flip. The transition to light is triggered
+    // by an absolutely-positioned [data-section-theme="light"] sentinel
+    // placed `calc(100vh + 80px)` below the section's top edge — when
+    // that sentinel's top crosses the viewport bottom (i.e. when the
+    // user has scrolled ~80px past where AI Catalogue ends), the
+    // wrapper transitions to light. The 80px buffer ensures any
+    // lingering AI Catalogue cards have fully cleared the top edge of
+    // the viewport before the canvas crossfades, so the dark cards
+    // never end up briefly sitting against a light bg.
+    //
+    // The cards grid stays inside the dark section without its own
+    // light sentinel wrapper — they render in dark mode while AI
+    // Catalogue is exiting (currentColor handles text), then transition
+    // to light naturally as the wrapper theme flips. Format cards use
+    // currentColor + opacity for title/body so they read clean in both.
+    <section data-section-theme="dark" style={{ padding: "120px 0", position: "relative" }}>
+      {/* Delayed light-mode sentinel — empty absolute marker, 1×1 px,
+          positioned 100vh + 80px below the section's top. */}
+      <div
+        data-section-theme="light"
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: "calc(100vh + 80px)",
+          left: 0,
+          width: 1,
+          height: 1,
+          pointerEvents: "none",
+        }}
+      />
       <Container>
-        {/* Eyebrow + centered headline + centered body — matches the spec.
-            Inline the label (instead of <SectionLabel/>) so we can pin the
-            gap to title at exactly 16px — SectionLabel ships its own 28px
-            margin-bottom which made the stack feel airy. */}
+        {/* Eyebrow + centered headline + centered body. Headline + body
+            use currentColor so they fade with the wrapper's theme
+            transition automatically — eyebrow stays persimmon, which
+            reads on both dark and light backgrounds. */}
         <div style={{ textAlign: "center", marginBottom: 64 }}>
           <ScrollReveal>
             <div style={{ marginBottom: 16 }}>
@@ -3098,8 +3316,12 @@ function Segmenter() {
           </ScrollReveal>
         </div>
         {/* Format cards cascade in 90ms apart via StaggerGroup.
-            alignItems:stretch + height:100% on the wrappers makes every card
-            match the tallest one in the row regardless of body length. */}
+            alignItems:stretch + height:100% on the wrappers makes every
+            card match the tallest one in the row regardless of body
+            length. Theme is driven by the absolute light sentinel above
+            (top: calc(100vh + 80px)) instead of wrapping the cards in
+            their own data-section-theme — keeps the flip from firing
+            while the AI Catalogue cards are still on screen. */}
         <StaggerGroup
           perItemDelay={90}
           style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, alignItems: "stretch" }}
@@ -3330,7 +3552,11 @@ function FormatCard({ title, body, cta, bg, icon, iconWidth = 120 }) {
               fontSize: 18,
               fontWeight: 600,
               letterSpacing: "-0.005em",
-              color: T.ink,
+              // currentColor inherits the wrapper's transitioning text
+              // color — bone-900 in light mode, bone-100 (whisper) in
+              // dark. Means the card title fades along with the rest of
+              // the section's text when the dark→light theme swap fires.
+              color: "currentColor",
               lineHeight: 1.56,
             }}
           >
@@ -3342,7 +3568,11 @@ function FormatCard({ title, body, cta, bg, icon, iconWidth = 120 }) {
               fontSize: 12,
               fontWeight: 400,
               letterSpacing: "-0.005em",
-              color: T.inkMuted,
+              // currentColor + 60% opacity → roughly matches the old
+              // T.inkMuted (bone-700) in light mode and lands on
+              // bone-100 @ alpha 60 in dark mode as requested.
+              color: "currentColor",
+              opacity: 0.6,
               lineHeight: 1.4,
             }}
           >
@@ -3389,7 +3619,10 @@ function HowItWorks() {
     {
       kicker: "Step 01 · Connect",
       title: "Plug into your stack. Keep what works.",
-      body: "Nova's digital front — online ordering, mobile app, loyalty, and analytics — sits on top of the systems you already run. No rip-and-replace. Roll it out brand-by-brand, region-by-region, on the timeline your operations team is comfortable with.",
+      // Trimmed so the body wraps to the same height as steps 02 / 03 —
+      // the HowItWorks lottie below is sized to remaining vertical space,
+      // so an oversized body was shrinking the lottie on step 01.
+      body: "Nova's digital front sits on top of the systems you already run. No rip-and-replace — roll it out on your timeline.",
       accent: T.persimmon500,
     },
     {
@@ -3429,7 +3662,13 @@ function HowItWorks() {
                   style={{
                     fontFamily: FONT_DISPLAY,
                     fontSize: 48,
-                    lineHeight: 1.08,
+                    // 1.15 + paddingBottom 6 gives descenders ("g" in
+                    // "Plug", "y" in "your") enough room below the
+                    // baseline to clear BiMaskReveal's clip-path. At
+                    // lineHeight 1.08 they were sitting outside the
+                    // element box and getting cropped.
+                    lineHeight: 1.15,
+                    paddingBottom: 6,
                     letterSpacing: "-0.035em",
                     fontWeight: 500,
                     color: "currentColor",
@@ -3502,22 +3741,41 @@ function HowItWorks() {
 //  the lottie eventually catches the text up via chained transitions.
 // =========================================================
 function HowVisual({ stepIndex }) {
-  // `activeIdle` = which idle Lottie should be visible when no
-  // transition is playing. Lags `stepIndex` until the transition lottie
-  // for that phase change completes (so the visual swap happens at the
-  // end of the artist's animation, not at scroll-cross time).
+  // `activeIdle` = which idle Lottie is currently visible. We only flip
+  // this AFTER the transition lottie reaches its last frame — that way
+  // the visual swap lands on the artist's intended hand-off frame, not
+  // at scroll-cross time.
   const [activeIdle, setActiveIdle] = useState(0);
   // Active transition descriptor or null. `key` matches one of the four
-  // pre-mounted transition lotties; `playKey` is a monotonic value that
-  // re-fires the LottiePlayer's replay effect when bumped; `destStep` is
-  // which idle takes over once the transition completes.
+  // pre-mounted transition lotties; `playKey` re-fires the LottiePlayer's
+  // replay effect when bumped; `destStep` is the idle that takes over
+  // when the transition reaches its final frame.
   const [transition, setTransition] = useState(null);
-  // We track the previous stepIndex via a ref so the scroll-driven step
-  // changes can compute direction (forward vs reverse) without making
+  // Latest stepIndex driven by scroll — kept in a ref so we can read it
+  // synchronously from inside lottie's `complete` event without making
   // the effect's dep list noisy.
   const prevStepRef = useRef(0);
 
-  // Build the file slug + destination for a single-step transition.
+  // Imperative refs to every idle and transition lottie. The transition
+  // hand-off relies on `idleRefs[dest].current.goToAndPlay(0)` being
+  // called synchronously, BEFORE we flip opacity — otherwise the React
+  // commit makes the dest idle visible for one frame at whatever frame
+  // it happened to be looping at (the "blink" the user saw).
+  const idleRefs = useRef([null, null, null]);
+  const transitionRefs = useRef({});
+
+  // Track the previously-visible layer so we can reset it to frame 0
+  // the moment it becomes invisible. Without this, any layer that's
+  // already been played (idle P01 after autoplaying then pausing
+  // mid-loop, or any transition after completing at frame 120) stays
+  // pinned at its stale frame — and the NEXT time it becomes visible
+  // there's a one-frame window where the user sees that stale frame
+  // before the imperative goToAndPlay(0) paint catches up. That window
+  // was the reverse-scroll blink.
+  const prevVisibleIdleRef = useRef(0);
+  const prevVisibleTransitionRef = useRef(null);
+
+  // Build the file slug for a single-step transition between two steps.
   const slugFor = (from, to) => {
     const forward = to > from;
     return forward
@@ -3535,38 +3793,72 @@ function HowVisual({ stepIndex }) {
     prevStepRef.current = stepIndex;
     if (transition) return; // chained handling lives in onComplete
     const next = prev + (stepIndex > prev ? 1 : -1);
+    const transKey = slugFor(prev, next);
+    // Synchronously prime the incoming transition at frame 0 BEFORE we
+    // flip its `paused` and opacity via setState. Otherwise — if this
+    // transition has been played before — it's still sitting at its
+    // last frame (frame 120), and the React commit briefly shows that
+    // stale frame before the playKey effect catches up.
+    transitionRefs.current[transKey]?.goToAndPlay(0, true);
     setTransition({
-      key: slugFor(prev, next),
+      key: transKey,
       playKey: Date.now(),
       destStep: next,
     });
-    // We intentionally don't snap activeIdle here — the swap waits until
-    // the transition lottie reaches its final frame so the visual hand-off
-    // happens on the artist's beat, not the scroll event.
   }, [stepIndex, transition]);
 
+  // Outgoing-layer cleanup: the moment a layer becomes invisible, snap
+  // its SVG to frame 0 + stop. That way the NEXT time it's activated
+  // there's no window where it briefly shows a stale frame. Runs after
+  // paint, but that's fine — the layer is already invisible by then.
+  useEffect(() => {
+    const currentIdle = transition ? null : activeIdle;
+    const prevIdle = prevVisibleIdleRef.current;
+    if (prevIdle !== null && prevIdle !== currentIdle) {
+      try { idleRefs.current[prevIdle]?.goToAndStop(0, true); } catch (e) { /* noop */ }
+    }
+    prevVisibleIdleRef.current = currentIdle;
+
+    const currentTrans = transition?.key || null;
+    const prevTrans = prevVisibleTransitionRef.current;
+    if (prevTrans && prevTrans !== currentTrans) {
+      try { transitionRefs.current[prevTrans]?.goToAndStop(0, true); } catch (e) { /* noop */ }
+    }
+    prevVisibleTransitionRef.current = currentTrans;
+  }, [activeIdle, transition]);
+
   const onTransitionComplete = () => {
-    setActiveIdle((current) => {
-      const dest = transition ? transition.destStep : current;
-      // Snapshot the live stepIndex via the ref — by the time the
-      // transition completes the user may have scrolled further.
-      const latest = prevStepRef.current;
-      if (dest === latest) {
-        // We landed on the live step — clear the transition and let the
-        // idle take over.
-        setTransition(null);
-      } else {
-        // User scrolled past us mid-transition. Chain one more single-step
-        // transition toward the latest step.
-        const nextDest = dest + (latest > dest ? 1 : -1);
-        setTransition({
-          key: slugFor(dest, nextDest),
-          playKey: Date.now(),
-          destStep: nextDest,
-        });
-      }
-      return dest;
-    });
+    if (!transition) return;
+    const dest = transition.destStep;
+    const latest = prevStepRef.current;
+
+    if (dest === latest) {
+      // SYNCHRONOUSLY prime the dest idle at frame 0 + playing BEFORE we
+      // flip React state. By the time the next render commits and the
+      // idle becomes visible, the lottie is already past frame 0 by a
+      // tick or two — but critically it's playing from the matching
+      // "at rest" start, not catching mid-loop. This is what kills the
+      // blink: the transition's last frame and the idle's frame 0 are
+      // the same visual, so the hard-cut between them is invisible.
+      idleRefs.current[dest]?.goToAndPlay(0, true);
+      setActiveIdle(dest);
+      setTransition(null);
+    } else {
+      // User scrolled past us mid-transition. Chain one more single-step
+      // transition toward the latest step. Prime the chained transition
+      // at frame 0 synchronously so the swap from the just-completed
+      // transition (now at its last frame 120) to the next transition
+      // is invisible — both should depict the same intermediate step.
+      const nextDest = dest + (latest > dest ? 1 : -1);
+      const nextKey = slugFor(dest, nextDest);
+      transitionRefs.current[nextKey]?.goToAndPlay(0, true);
+      setActiveIdle(dest);
+      setTransition({
+        key: nextKey,
+        playKey: Date.now(),
+        destStep: nextDest,
+      });
+    }
   };
 
   const idles = [0, 1, 2];
@@ -3588,15 +3880,21 @@ function HowVisual({ stepIndex }) {
         margin: "0 auto",
       }}
     >
-      {/* Idle layer — all 3 mounted, only the active one visible. */}
+      {/* Idle layer — all 3 mounted, only the active one visible.
+          Hard-cut opacity (no transition) plus the synchronous
+          goToAndPlay(0) in onTransitionComplete means the swap from
+          transition lottie → idle lottie lands on two matching frames.
+          Inactive idles are paused to keep them out of the CPU loop. */}
       {idles.map((i) => {
         const visible = !transition && activeIdle === i;
         return (
           <LottiePlayer
             key={`idle-${i}`}
+            ref={(el) => { idleRefs.current[i] = el; }}
             src={`/lotties/howitworks/p0${i + 1}.json`}
             loop
-            autoplay
+            autoplay={i === 0}
+            paused={!visible}
             ariaLabel={`Plug-in-stack step ${i + 1} idle animation`}
             style={{
               position: "absolute",
@@ -3604,22 +3902,25 @@ function HowVisual({ stepIndex }) {
               width: "100%",
               height: "100%",
               opacity: visible ? 1 : 0,
-              transition: "opacity 320ms ease",
               pointerEvents: "none",
             }}
           />
         );
       })}
-      {/* Transition layer — all 4 mounted paused; the active one fades in
-          and plays once, then hands back to the idle of `destStep`. */}
+      {/* Transition layer — all 4 mounted paused; the active one is
+          visible (hard cut) and replays from frame 0 via `playKey`
+          whenever it becomes active. On `complete` it hands off to the
+          dest idle. */}
       {transitionKeys.map((tKey) => {
         const active = transition?.key === tKey;
         return (
           <LottiePlayer
             key={`trans-${tKey}`}
+            ref={(el) => { transitionRefs.current[tKey] = el; }}
             src={`/lotties/howitworks/${tKey}.json`}
             loop={false}
             autoplay={false}
+            paused={!active}
             playKey={active ? transition.playKey : 0}
             onComplete={active ? onTransitionComplete : undefined}
             ariaLabel={`Plug-in-stack transition ${tKey}`}
@@ -3629,7 +3930,6 @@ function HowVisual({ stepIndex }) {
               width: "100%",
               height: "100%",
               opacity: active ? 1 : 0,
-              transition: "opacity 200ms ease",
               pointerEvents: "none",
             }}
           />
