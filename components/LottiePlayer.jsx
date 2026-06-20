@@ -13,6 +13,15 @@ import { useEffect, useRef, useState } from "react";
  * Honours `prefers-reduced-motion` automatically — if the user has
  * reduced motion enabled the animation stays paused; we render the
  * fallback (which can be a static SVG poster for that slot).
+ *
+ * Extras:
+ * - `loop={false}` plays once and fires `onComplete` when the final frame
+ *   is reached. Used by the HowItWorks scroll-synced transition layer to
+ *   know when to hand back to the idle Lottie.
+ * - `speed` multiplies playback rate (default 1).
+ * - `playKey` — when this prop value changes while loop=false, the
+ *   animation rewinds and plays from frame 0 again. Lets one mounted
+ *   player handle repeated one-shots without remount churn.
  */
 export default function LottiePlayer({
   src,
@@ -22,10 +31,17 @@ export default function LottiePlayer({
   style,
   className,
   ariaLabel,
+  onComplete,
+  speed = 1,
+  playKey,
 }) {
   const containerRef = useRef(null);
   const animRef = useRef(null);
   const [ready, setReady] = useState(false);
+  // Stash the latest onComplete in a ref so we don't have to re-init the
+  // animation when the parent passes a new callback closure each render.
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +69,12 @@ export default function LottiePlayer({
           animationData: json,
           rendererSettings: { preserveAspectRatio: "xMidYMid meet" },
         });
+        anim.setSpeed(speed);
+        if (!loop) {
+          anim.addEventListener("complete", () => {
+            if (onCompleteRef.current) onCompleteRef.current();
+          });
+        }
         animRef.current = anim;
         setReady(true);
       } catch (e) {
@@ -67,7 +89,16 @@ export default function LottiePlayer({
         animRef.current = null;
       }
     };
-  }, [src, loop, autoplay]);
+  }, [src, loop, autoplay, speed]);
+
+  // Replay-on-key: when playKey flips while loop=false, rewind & play.
+  useEffect(() => {
+    if (loop) return;
+    if (!animRef.current) return;
+    try {
+      animRef.current.goToAndPlay(0, true);
+    } catch (e) { /* noop */ }
+  }, [playKey, loop]);
 
   return (
     <div

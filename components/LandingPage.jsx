@@ -3463,9 +3463,12 @@ function HowItWorks() {
             </PhaseTransition>
           </div>
 
-          {/* BOTTOM: visual fills remaining vertical space */}
+          {/* BOTTOM: visual fills remaining vertical space. Replaces the
+              former hand-rolled dark product-mock card — the Lottie stage
+              IS the visual now, sized to fit available height as a 1:1
+              square (the artist authored the file at 400×400). */}
           <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: 40, minHeight: 0 }}>
-            <HowVisual step={stepIndex} accent={step.accent} />
+            <HowVisual stepIndex={stepIndex} />
           </div>
         </Container>
       </div>
@@ -3473,55 +3476,165 @@ function HowItWorks() {
   );
 }
 
-function HowVisual({ step, accent }) {
+// =========================================================
+//  HOWVISUAL — Scroll-synced Lottie stage for HowItWorks
+//
+//  Replaces the hand-rolled dark product-mock card with the artist's
+//  plug-in-stack lotties. Architecture:
+//
+//  - 3 IDLE lotties (P01, P02, P03) — one per step. All three mount once
+//    on first render and loop forever; opacity toggles which one is
+//    visible. Keeps memory steady and avoids re-fetch flashes on phase
+//    swap.
+//  - 4 TRANSITION lotties (forward P01→P02, P02→P03, and the two
+//    reverses) — also pre-mounted with autoplay=false. When the user
+//    crosses a step boundary, we flip the matching transition's
+//    `playKey` to fire `goToAndPlay(0)` and fade it in on top of the
+//    idles. On the lottie's `complete` event we hand back to the idle of
+//    the destination step.
+//
+//  Direction rule: forward scroll plays the matching forward transition,
+//  backward scroll plays the matching reverse. If the user crosses two
+//  boundaries in quick succession we let the in-flight transition finish
+//  (text already crossfaded ahead of it — that's fine) and then chain
+//  another transition from the just-reached step toward the current
+//  stepIndex. So slow scroll = clean per-phase animation; fast scroll =
+//  the lottie eventually catches the text up via chained transitions.
+// =========================================================
+function HowVisual({ stepIndex }) {
+  // `activeIdle` = which idle Lottie should be visible when no
+  // transition is playing. Lags `stepIndex` until the transition lottie
+  // for that phase change completes (so the visual swap happens at the
+  // end of the artist's animation, not at scroll-cross time).
+  const [activeIdle, setActiveIdle] = useState(0);
+  // Active transition descriptor or null. `key` matches one of the four
+  // pre-mounted transition lotties; `playKey` is a monotonic value that
+  // re-fires the LottiePlayer's replay effect when bumped; `destStep` is
+  // which idle takes over once the transition completes.
+  const [transition, setTransition] = useState(null);
+  // We track the previous stepIndex via a ref so the scroll-driven step
+  // changes can compute direction (forward vs reverse) without making
+  // the effect's dep list noisy.
+  const prevStepRef = useRef(0);
+
+  // Build the file slug + destination for a single-step transition.
+  const slugFor = (from, to) => {
+    const forward = to > from;
+    return forward
+      ? `p0${from + 1}-p0${to + 1}`
+      : `reverse-p0${from + 1}-p0${to + 1}`;
+  };
+
+  // React to scroll-driven stepIndex changes. If no transition is in
+  // flight, kick off the appropriate single-step transition; otherwise
+  // just remember the new stepIndex — the in-flight transition's
+  // onComplete will chain forward toward it.
+  useEffect(() => {
+    const prev = prevStepRef.current;
+    if (prev === stepIndex) return;
+    prevStepRef.current = stepIndex;
+    if (transition) return; // chained handling lives in onComplete
+    const next = prev + (stepIndex > prev ? 1 : -1);
+    setTransition({
+      key: slugFor(prev, next),
+      playKey: Date.now(),
+      destStep: next,
+    });
+    // We intentionally don't snap activeIdle here — the swap waits until
+    // the transition lottie reaches its final frame so the visual hand-off
+    // happens on the artist's beat, not the scroll event.
+  }, [stepIndex, transition]);
+
+  const onTransitionComplete = () => {
+    setActiveIdle((current) => {
+      const dest = transition ? transition.destStep : current;
+      // Snapshot the live stepIndex via the ref — by the time the
+      // transition completes the user may have scrolled further.
+      const latest = prevStepRef.current;
+      if (dest === latest) {
+        // We landed on the live step — clear the transition and let the
+        // idle take over.
+        setTransition(null);
+      } else {
+        // User scrolled past us mid-transition. Chain one more single-step
+        // transition toward the latest step.
+        const nextDest = dest + (latest > dest ? 1 : -1);
+        setTransition({
+          key: slugFor(dest, nextDest),
+          playKey: Date.now(),
+          destStep: nextDest,
+        });
+      }
+      return dest;
+    });
+  };
+
+  const idles = [0, 1, 2];
+  const transitionKeys = [
+    "p01-p02",
+    "p02-p03",
+    "reverse-p02-p01",
+    "reverse-p03-p02",
+  ];
+
   return (
     <div
-      key={`viz-${step}`}
       style={{
         position: "relative",
-        width: "100%",
-        maxWidth: 960,
-        aspectRatio: "16/10",
+        height: "100%",
+        aspectRatio: "1 / 1",
+        maxWidth: "100%",
         maxHeight: "100%",
         margin: "0 auto",
-        animation: "step-fade 700ms cubic-bezier(0.22, 1, 0.36, 1)",
       }}
     >
-      <PlaceholderTag>Lottie · step {String(step + 1).padStart(2, "0")}</PlaceholderTag>
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: -30,
-          background: `radial-gradient(circle at 60% 40%, ${accent}55, transparent 65%), radial-gradient(circle at 30% 70%, ${T.persimmon500}33, transparent 60%)`,
-          filter: "blur(40px)",
-          transition: "background 600ms ease",
-        }}
-      />
-      {/* Dark product-preview card floating on the light section. Solid dark
-          ramp (#171721 with a hair-thin border) so the UI mock reads as a
-          screenshot of the Nova product, lifted off the page by a soft shadow. */}
-      <div
-        style={{
-          position: "relative",
-          height: "100%",
-          background: "#171721",
-          border: "1px solid #2A2A35",
-          borderRadius: 24,
-          padding: 36,
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-          overflow: "hidden",
-          boxShadow:
-            "0 24px 60px -28px rgba(20,17,15,0.28), 0 6px 18px -10px rgba(20,17,15,0.18)",
-        }}
-      >
-        {/* Step-specific product UI mock */}
-        {step === 0 && <ConnectViz accent={accent} />}
-        {step === 1 && <UnifyViz accent={accent} />}
-        {step === 2 && <ImproveViz accent={accent} />}
-      </div>
+      {/* Idle layer — all 3 mounted, only the active one visible. */}
+      {idles.map((i) => {
+        const visible = !transition && activeIdle === i;
+        return (
+          <LottiePlayer
+            key={`idle-${i}`}
+            src={`/lotties/howitworks/p0${i + 1}.json`}
+            loop
+            autoplay
+            ariaLabel={`Plug-in-stack step ${i + 1} idle animation`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: visible ? 1 : 0,
+              transition: "opacity 320ms ease",
+              pointerEvents: "none",
+            }}
+          />
+        );
+      })}
+      {/* Transition layer — all 4 mounted paused; the active one fades in
+          and plays once, then hands back to the idle of `destStep`. */}
+      {transitionKeys.map((tKey) => {
+        const active = transition?.key === tKey;
+        return (
+          <LottiePlayer
+            key={`trans-${tKey}`}
+            src={`/lotties/howitworks/${tKey}.json`}
+            loop={false}
+            autoplay={false}
+            playKey={active ? transition.playKey : 0}
+            onComplete={active ? onTransitionComplete : undefined}
+            ariaLabel={`Plug-in-stack transition ${tKey}`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: active ? 1 : 0,
+              transition: "opacity 200ms ease",
+              pointerEvents: "none",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
